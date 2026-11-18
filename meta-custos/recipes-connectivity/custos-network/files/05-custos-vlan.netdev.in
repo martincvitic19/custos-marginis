@@ -1,0 +1,6 @@
+[NetDev]
+Name=@NAME@
+Kind=vlan
+
+[VLAN]
+Id=@ID@

@@ -1,0 +1,12 @@
+# The bridge device itself (CPU side): tagged member of every LAN VLAN, no
+# address. The per-VLAN interfaces on top of it carry the gateway addresses.
+[Match]
+Name=@BRIDGE@
+
+[Link]
+RequiredForOnline=no
+
+[Network]
+LinkLocalAddressing=no
+IPv6AcceptRA=no
+ConfigureWithoutCarrier=yes

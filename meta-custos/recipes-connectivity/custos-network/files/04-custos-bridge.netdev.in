@@ -1,0 +1,10 @@
+# VLAN-aware LAN bridge. DefaultPVID=none: no port (and not the bridge
+# itself) joins any VLAN that is not listed explicitly.
+[NetDev]
+Name=@BRIDGE@
+Kind=bridge
+
+[Bridge]
+VLANFiltering=yes
+DefaultPVID=none
+STP=no
