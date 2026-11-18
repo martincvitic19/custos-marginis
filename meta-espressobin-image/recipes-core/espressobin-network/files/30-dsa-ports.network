@@ -1,0 +1,12 @@
+# Remaining switch ports: up, no address. The management port is matched
+# first by 20-mgmt-port.network.
+[Match]
+Name=wan lan*
+
+[Link]
+RequiredForOnline=no
+
+[Network]
+LinkLocalAddressing=no
+IPv6AcceptRA=no
+ConfigureWithoutCarrier=yes
