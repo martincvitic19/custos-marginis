@@ -1,0 +1,11 @@
+# short-description: microSD image for the ESPRESSObin factory U-Boot
+# long-description: The factory bootcmd runs
+#   ext4load mmc 0:1 0x6d00000 boot.scr; source 0x6d00000
+# so partition 1 is ext4 and holds boot.scr, Image and the DTB. It is not
+# mounted (no mountpoint), which keeps it out of /etc/fstab. boot.scr passes
+# the root partition to the kernel as root=PARTUUID=<disk id>-02.
+
+part --source bootimg_partition --ondisk mmcblk0 --fstype=ext4 --label boot --active --align 4096 --size 64
+part / --source rootfs --ondisk mmcblk0 --fstype=ext4 --label root --align 4096
+
+bootloader --ptable msdos

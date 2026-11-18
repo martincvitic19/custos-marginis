@@ -1,0 +1,13 @@
+# Management port with a static address. KeepConfiguration keeps an address
+# the kernel already set up (ip= for NFS root) instead of flushing it.
+[Match]
+Name=@PORT@
+
+[Link]
+RequiredForOnline=no
+
+[Network]
+Address=@ADDRESS@
+IPv6AcceptRA=no
+ConfigureWithoutCarrier=yes
+KeepConfiguration=static

@@ -1,0 +1,8 @@
+# Build outputs and caches (all on the project disk, never committed)
+build/
+layers/
+downloads/
+sstate-cache/
+tmp/
+# Generated SSH key pair for the board
+keys/

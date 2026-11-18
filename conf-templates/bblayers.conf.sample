@@ -1,0 +1,11 @@
+# Layer list for the vanilla (oe-init-build-env) flow. ##OEROOT## is
+# <checkout>/layers/openembedded-core, see README.md.
+BBPATH = "${TOPDIR}"
+BBFILES ?= ""
+
+BBLAYERS ?= " \
+  ##OEROOT##/meta \
+  ##OEROOT##/../meta-yocto/meta-poky \
+  ##OEROOT##/../../meta-espressobin \
+  ##OEROOT##/../../meta-espressobin-image \
+  "
