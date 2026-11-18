@@ -1,0 +1,6 @@
+
+ESPRESSObin (MACHINE = "espressobin"), Yocto Project 6.0 LTS "wrynose".
+
+    bitbake core-image-minimal
+
+Images are written to tmp/deploy/images/espressobin/.
