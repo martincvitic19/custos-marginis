@@ -1,0 +1,55 @@
+#!/usr/sbin/nft -f
+# Custos edge router ruleset, loaded atomically by custos-firewall.service.
+# Generated from custos-firewall.nft.in; interface names come from the
+# network plan (custos-net.inc).
+#
+#   input:   default drop. DHCP and ping from the LAN VLANs, SSH and web UI
+#            only from the admin VLAN. Nothing is reachable from wan.
+#   forward: default drop. LAN VLANs -> wan only; inter-VLAN dropped.
+#   nat:     masquerade everything leaving through wan.
+# Every drop is counted:  nft list table inet custos
+
+define WAN_IF = "@WAN_IF@"
+define LAN_IFS = { @LAN_IFS@ }
+define ADMIN_IF = "@ADMIN_IF@"
+define ADMIN_TCP_PORTS = { 22, 80, 443 }
+
+# Replace the table in one transaction (no window without rules).
+table inet custos
+delete table inet custos
+
+table inet custos {
+	chain input {
+		type filter hook input priority filter; policy drop;
+
+		ct state established,related accept
+		ct state invalid counter drop comment "input: invalid"
+		iif "lo" accept
+
+		# Clients have no address yet, so match the interface only.
+		iifname $LAN_IFS udp sport 68 udp dport 67 accept comment "DHCP"
+		# Ping only the gateway address of the client's own VLAN.
+		iifname $LAN_IFS icmp type echo-request fib daddr . iif type local limit rate 10/second accept comment "ping own gateway"
+		iifname $ADMIN_IF tcp dport $ADMIN_TCP_PORTS accept comment "management from admin VLAN"
+
+		counter drop comment "input: default drop"
+	}
+
+	chain forward {
+		type filter hook forward priority filter; policy drop;
+
+		ct state established,related accept
+		ct state invalid counter drop comment "forward: invalid"
+
+		iifname $LAN_IFS oifname $WAN_IF accept comment "LAN VLANs to internet"
+		iifname $LAN_IFS oifname $LAN_IFS counter drop comment "forward: inter-VLAN"
+
+		counter drop comment "forward: default drop"
+	}
+
+	chain postrouting {
+		type nat hook postrouting priority srcnat; policy accept;
+
+		oifname $WAN_IF masquerade comment "NAT behind the wan address"
+	}
+}

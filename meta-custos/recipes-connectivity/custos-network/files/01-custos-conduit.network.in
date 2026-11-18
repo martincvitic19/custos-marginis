@@ -1,0 +1,13 @@
+# DSA conduit: CPU port of the 88E6341 switch. Brought up first and kept up
+# so the switch user ports can pass traffic; it carries no address itself.
+[Match]
+Name=@CONDUIT@
+
+[Link]
+RequiredForOnline=no
+ActivationPolicy=always-up
+
+[Network]
+LinkLocalAddressing=no
+IPv6AcceptRA=no
+ConfigureWithoutCarrier=yes

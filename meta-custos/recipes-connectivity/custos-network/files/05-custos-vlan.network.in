@@ -1,0 +1,22 @@
+# Gateway and DHCP server for one LAN VLAN.
+[Match]
+Name=@NAME@
+
+[Link]
+RequiredForOnline=no
+
+[Network]
+Address=@ADDRESS@
+LinkLocalAddressing=no
+IPv6AcceptRA=no
+ConfigureWithoutCarrier=yes
+DHCPServer=yes
+
+[DHCPServer]
+PoolOffset=100
+PoolSize=100
+DefaultLeaseTimeSec=1h
+MaxLeaseTimeSec=12h
+EmitRouter=yes
+EmitDNS=yes
+DNS=@DNS@

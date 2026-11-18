@@ -1,0 +1,18 @@
+# LAN switch port enslaved to the VLAN-aware bridge. The 88E6341 offloads
+# the bridge: traffic within one VLAN is switched in hardware, traffic
+# between VLANs is routed (and filtered) by the CPU.
+[Match]
+Name=@PORT@
+
+[Link]
+RequiredForOnline=no
+
+[Network]
+Bridge=@BRIDGE@
+LinkLocalAddressing=no
+IPv6AcceptRA=no
+ConfigureWithoutCarrier=yes
+
+[BridgeVLAN]
+PVID=@PVID@
+EgressUntagged=@PVID@

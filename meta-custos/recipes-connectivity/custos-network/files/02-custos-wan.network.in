@@ -1,0 +1,23 @@
+# WAN switch port: static address behind the ISP router (double NAT).
+# Management services are never reachable here (see custos-firewall).
+[Match]
+Name=@WAN_IF@
+
+[Link]
+RequiredForOnline=routable
+
+[Network]
+Address=@WAN_ADDRESS@
+Gateway=@WAN_GATEWAY@
+DNS=@WAN_DNS@
+LinkLocalAddressing=no
+IPv6AcceptRA=no
+ConfigureWithoutCarrier=yes
+
+# Egress queueing. NAT=yes makes flow isolation see the LAN hosts behind
+# the masquerade; ethernet framing overhead towards the ISP router.
+[CAKE]
+FlowIsolationMode=dual-src-host
+NAT=yes
+OverheadBytes=38
+MPUBytes=84

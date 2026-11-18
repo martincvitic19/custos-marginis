@@ -1,0 +1,20 @@
+[Unit]
+Description=Custos nftables firewall
+Documentation=man:nft(8)
+# Load the ruleset before any interface is configured.
+DefaultDependencies=no
+Wants=network-pre.target
+Before=network-pre.target shutdown.target
+After=local-fs.target systemd-modules-load.service
+Conflicts=shutdown.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/nft -f /etc/custos/firewall.nft
+# Reload re-applies the file atomically; use it instead of restart.
+ExecReload=/usr/sbin/nft -f /etc/custos/firewall.nft
+# No ExecStop: stopping the unit leaves the rules in place (fail closed).
+
+[Install]
+WantedBy=sysinit.target
