@@ -1,0 +1,2 @@
+# The Dockerfile needs no build context; keep the (huge) build tree out of it.
+*
