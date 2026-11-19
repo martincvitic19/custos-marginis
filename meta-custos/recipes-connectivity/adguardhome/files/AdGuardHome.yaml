@@ -1,0 +1,127 @@
+# Custos Marginis: initial AdGuard Home configuration (v0.107.79, schema 34).
+# Copied to /data/adguardhome/AdGuardHome.yaml on the first start only.
+# AdGuard Home rewrites that copy (and drops these comments) whenever a
+# setting changes in the UI. Keys left out here keep the upstream defaults
+# (internal/home/config.go). Rationale: docs/dns-enforcement.md.
+schema_version: 34
+
+http:
+  # Web UI and API on loopback only, never on a LAN VLAN or wan. Reach it
+  # through SSH from the admin VLAN:
+  #   ssh -L 3000:127.0.0.1:3000 root@192.168.20.1  -> http://localhost:3000
+  address: 127.0.0.1:3000
+  session_ttl: 720h
+# No UI users: only someone already logged in on the router can reach the
+# UI. Add a user (bcrypt hash) before the UI is exposed anywhere else.
+users: []
+
+dns:
+  # All addresses; custos-firewall only lets the LAN VLANs and wg0 in (the
+  # client DNS redirect lands here), never wan.
+  bind_hosts:
+    - 0.0.0.0
+  port: 53
+  # Encrypted upstreams only; the ISP router never sees client queries.
+  upstream_dns:
+    - https://dns.quad9.net/dns-query
+    - https://dns.mullvad.net/dns-query
+  upstream_mode: load_balance
+  # Plain DNS, used only to resolve the two upstream host names.
+  # 9.9.9.9 = Quad9, 194.242.2.2 = dns.mullvad.net.
+  bootstrap_dns:
+    - 9.9.9.9
+    - 194.242.2.2
+  fallback_dns: []
+  cache_enabled: true
+  cache_size: 8388608
+  enable_dnssec: true
+  # Client addresses stay as they are (the redirect keeps the source).
+  anonymize_client_ip: false
+  # Do not send PTR queries for LAN addresses to the ISP router.
+  use_private_ptr_resolvers: false
+  local_ptr_upstreams: []
+
+tls:
+  enabled: false
+
+querylog:
+  enabled: true
+  file_enabled: true
+  interval: 168h
+  size_memory: 1000
+  ignored: []
+
+statistics:
+  enabled: true
+  interval: 168h
+  ignored: []
+
+# HaGeZi DNS blocklists (GPL-3.0), downloaded by AdGuard Home at runtime and
+# refreshed every filters_update_interval hours.
+filters:
+  - enabled: true
+    url: https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/pro.txt
+    name: HaGeZi Multi PRO
+    id: 1
+  - enabled: true
+    url: https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/tif.medium.txt
+    name: HaGeZi Threat Intelligence Feeds (medium)
+    id: 2
+  - enabled: true
+    url: https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/nsfw.txt
+    name: HaGeZi NSFW
+    id: 3
+  - enabled: true
+    url: https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/doh-vpn-proxy-bypass.txt
+    name: HaGeZi DoH/VPN/TOR/Proxy Bypass
+    id: 4
+  - enabled: true
+    url: https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/gambling.txt
+    name: HaGeZi Gambling
+    id: 5
+  - enabled: true
+    url: https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/nosafesearch.txt
+    name: HaGeZi Search engines without SafeSearch
+    id: 6
+  - enabled: false
+    url: https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/social.txt
+    name: HaGeZi Social Networks (off; per-site policy)
+    id: 7
+whitelist_filters: []
+
+user_rules:
+  # Firefox canary: NXDOMAIN tells Firefox not to switch on its own DoH.
+  - '||use-application-dns.net^$dnsrewrite=NXDOMAIN'
+  # iCloud Private Relay: NXDOMAIN makes Apple devices fall back to the
+  # normal (filtered) path instead of tunnelling around it.
+  - '||mask.icloud.com^$dnsrewrite=NXDOMAIN'
+  - '||mask-h2.icloud.com^$dnsrewrite=NXDOMAIN'
+
+filtering:
+  protection_enabled: true
+  filtering_enabled: true
+  filters_update_interval: 24
+  blocking_mode: default
+  safe_search:
+    enabled: true
+    bing: true
+    duckduckgo: true
+    ecosia: true
+    google: true
+    pixabay: true
+    yandex: true
+    youtube: true
+
+clients:
+  runtime_sources:
+    # No WHOIS lookups of public addresses (privacy).
+    whois: false
+    arp: true
+    rdns: true
+    dhcp: false
+    hosts: true
+  persistent: []
+
+dhcp:
+  # systemd-networkd hands out leases.
+  enabled: false
