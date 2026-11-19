@@ -1,0 +1,50 @@
+# DNS enforcement for the Custos edge router (A3). Included by
+# /etc/custos/firewall.nft inside the same transaction, after the base table.
+# Generated from 10-dns-enforce.nft.in; interface names come from the network
+# plan (custos-net.inc).
+#
+#   dstnat:    every DNS query (udp/tcp 53) from a LAN VLAN or wg0, to any
+#              address, is redirected to the router's own port 53, where
+#              AdGuard Home answers. Only the destination changes, so AdGuard
+#              Home logs the client's real source address. A client set to
+#              8.8.8.8 gets a filtered answer that looks like it came from
+#              8.8.8.8 (conntrack reverses the NAT on the reply).
+#   dns_guard: (jumped to from forward) rejects the encrypted DNS transports
+#              that cannot be redirected: DoT (tcp 853), DoQ (udp 853, 784,
+#              8853) and DoH (tcp/udp 443) to known DoH resolver addresses.
+#              Reject, not drop: the client fails fast and falls back to plain
+#              DNS, which the redirect catches.
+#
+# IPv6: clients get no IPv6 (no RA, no DHCPv6, no global address, IPv6
+# forwarding off). dns_guard still drops forwarded IPv6 so that turning IPv6
+# on later cannot silently open a DNS bypass; see docs/dns-enforcement.md for
+# the ip6 rules (doh_v6 set) needed before that drop is removed.
+#
+# Counters:  nft list chain inet custos dstnat
+#            nft list chain inet custos dns_guard
+
+table inet custos {
+	# Public DoH resolver addresses. Elements come from 11-doh-v4.nft
+	# (generated at build time; custos-apply refreshes it on the device).
+	set doh_v4 {
+		type ipv4_addr
+		flags interval
+		auto-merge
+	}
+
+	chain dstnat {
+		type nat hook prerouting priority dstnat; policy accept;
+
+		iifname { @DNS_IFS@ } meta l4proto { tcp, udp } th dport 53 counter redirect to :53 comment "dns: force through AdGuard Home"
+	}
+
+	chain dns_guard {
+		meta nfproto ipv6 counter drop comment "dns: no IPv6 for clients"
+
+		tcp dport { 853, 784, 8853 } counter reject with tcp reset comment "dns: DoT"
+		udp dport { 853, 784, 8853 } counter reject comment "dns: DoQ"
+
+		ip daddr @doh_v4 tcp dport 443 counter reject with tcp reset comment "dns: DoH"
+		ip daddr @doh_v4 udp dport 443 counter reject comment "dns: DoH over HTTP/3"
+	}
+}

@@ -1,0 +1,13 @@
+# short-description: Custos microSD image for the ESPRESSObin factory U-Boot
+# long-description: espressobin.wks (meta-espressobin) plus a /data partition.
+# Partitions 1 (boot) and 2 (root) are unchanged: the factory bootcmd loads
+# boot.scr from mmc 0:1 and boot.scr passes root=PARTUUID=<disk id>-02.
+# Partition 3 holds the state that must survive a root file system update
+# (AdGuard Home configuration, query log, statistics); wic adds it to
+# /etc/fstab. It is created empty and formatted on every new image write.
+
+part --source bootimg_partition --ondisk mmcblk0 --fstype=ext4 --label boot --active --align 4096 --size 64
+part / --source rootfs --ondisk mmcblk0 --fstype=ext4 --label root --align 4096
+part /data --ondisk mmcblk0 --fstype=ext4 --label data --align 4096 --size 512
+
+bootloader --ptable msdos

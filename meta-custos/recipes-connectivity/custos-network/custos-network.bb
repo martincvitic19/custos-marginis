@@ -84,9 +84,11 @@ do_install() {
         name=${CUSTOS_BRIDGE}.$id
         sed -e "s,@NAME@,$name,g" -e "s,@ID@,$id,g" \
             ${UNPACKDIR}/05-custos-vlan.netdev.in > $netdir/05-custos-$name.netdev
+        dns="${CUSTOS_LAN_DNS}"
+        [ -n "$dns" ] || dns=192.168.$id.1
         sed -e "s,@NAME@,$name,g" \
             -e "s,@ADDRESS@,192.168.$id.1/24,g" \
-            -e 's,@DNS@,${CUSTOS_LAN_DNS},g' \
+            -e "s,@DNS@,$dns,g" \
             ${UNPACKDIR}/05-custos-vlan.network.in > $netdir/05-custos-$name.network
     done
 }
