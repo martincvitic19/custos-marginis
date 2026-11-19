@@ -24,9 +24,15 @@ CUSTOS_BRIDGE ?= "br-lan"
 CUSTOS_VLANS ?= "10 20 30"
 # VLAN that may reach the router's SSH and web UI.
 CUSTOS_ADMIN_VLAN ?= "20"
-# DNS server handed out by DHCP (A2: the ISP router; a local filtering
-# resolver replaces it later).
-CUSTOS_LAN_DNS ?= "${CUSTOS_WAN_DNS}"
+# DNS server handed out by DHCP. Empty: each VLAN gets its own gateway
+# address (192.168.<n>.1), where AdGuard Home answers. A client that ignores
+# it is redirected there anyway (custos-firewall, 10-dns-enforce.nft).
+CUSTOS_LAN_DNS ?= ""
+
+# WireGuard interface for remote clients. It does not exist yet; the DNS
+# enforcement rules already match it by name, so its DNS cannot bypass
+# AdGuard Home once it is added.
+CUSTOS_WG_IF ?= "wg0"
 
 # Bridge ports as <port>:<untagged PVID>:<tagged VLANs, comma separated>.
 # lan0: user VLAN 10 untagged, guest VLAN 30 tagged (VLAN-aware AP).
