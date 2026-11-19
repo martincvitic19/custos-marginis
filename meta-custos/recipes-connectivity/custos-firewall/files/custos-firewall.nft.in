@@ -7,11 +7,16 @@
 #            only from the admin VLAN. Nothing is reachable from wan.
 #   forward: default drop. LAN VLANs -> wan only; inter-VLAN dropped.
 #   nat:     masquerade everything leaving through wan.
+#   dns:     fragments in /etc/custos/firewall.d (10-dns-enforce.nft): all
+#            DNS from the LAN VLANs and wg0 is redirected to AdGuard Home,
+#            DoT/DoQ and known DoH resolvers are rejected (dns_guard).
 # Every drop is counted:  nft list table inet custos
 
 define WAN_IF = "@WAN_IF@"
 define LAN_IFS = { @LAN_IFS@ }
 define ADMIN_IF = "@ADMIN_IF@"
+# Interfaces whose DNS must go through AdGuard Home (LAN VLANs + WireGuard).
+define DNS_IFS = { @DNS_IFS@ }
 define ADMIN_TCP_PORTS = { 22, 80, 443 }
 
 # Replace the table in one transaction (no window without rules).
@@ -31,8 +36,15 @@ table inet custos {
 		# Ping only the gateway address of the client's own VLAN.
 		iifname $LAN_IFS icmp type echo-request fib daddr . iif type local limit rate 10/second accept comment "ping own gateway"
 		iifname $ADMIN_IF tcp dport $ADMIN_TCP_PORTS accept comment "management from admin VLAN"
+		# Also what the dstnat redirect turns every client DNS query into.
+		iifname $DNS_IFS meta l4proto { tcp, udp } th dport 53 accept comment "DNS to AdGuard Home"
 
 		counter drop comment "input: default drop"
+	}
+
+	# Filled by 10-dns-enforce.nft. Declared here so the jump below always
+	# has a target, even if the fragment is missing.
+	chain dns_guard {
 	}
 
 	chain forward {
@@ -41,6 +53,7 @@ table inet custos {
 		ct state established,related accept
 		ct state invalid counter drop comment "forward: invalid"
 
+		iifname $DNS_IFS jump dns_guard
 		iifname $LAN_IFS oifname $WAN_IF accept comment "LAN VLANs to internet"
 		iifname $LAN_IFS oifname $LAN_IFS counter drop comment "forward: inter-VLAN"
 
@@ -53,3 +66,6 @@ table inet custos {
 		oifname $WAN_IF masquerade comment "NAT behind the wan address"
 	}
 }
+
+# Fragments add to the table above (same transaction, still atomic).
+include "/etc/custos/firewall.d/*.nft"
