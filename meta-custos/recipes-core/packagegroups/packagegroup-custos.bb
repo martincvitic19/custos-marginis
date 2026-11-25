@@ -27,6 +27,7 @@ PACKAGES += "packagegroup-custos-vpn packagegroup-custos-security"
 # (Suricata, sshguard, arpwatch, AIDE) and the XDP edge filter. procps: ps -Z
 # (process domains) and ps -o; the busybox ps in this distro has neither.
 RDEPENDS:packagegroup-custos-security = " \
+    ${@bb.utils.contains('DISTRO_FEATURES', 'selinux', 'packagegroup-selinux-minimal policycoreutils-loadpolicy', '', d)} \
     auditd \
     custos-ids \
     procps \

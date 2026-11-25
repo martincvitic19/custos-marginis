@@ -20,6 +20,11 @@ IMAGE_INSTALL:remove = "espressobin-network"
 # by dropbear itself) or "ssh ... 'cat > file' < file".
 BAD_RECOMMENDATIONS += "openssh-sftp-server"
 
+# A10 run-time hardening (kernel lockdown after boot). Left out of
+# custos-image-baseline, the "before" image for the demo comparisons.
+CUSTOS_HARDENING ?= "custos-hardening"
+IMAGE_INSTALL:append = " ${CUSTOS_HARDENING}"
+
 # mDNS name custos.local (systemd-resolved answers on the admin VLAN).
 ROOTFS_POSTPROCESS_COMMAND += "custos_hostname;"
 custos_hostname() {
