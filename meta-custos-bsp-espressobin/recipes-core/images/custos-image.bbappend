@@ -2,6 +2,10 @@
 # for persistent service state (files/wic/custos-espressobin.wks in this layer).
 WKS_FILE:espressobin = "custos-espressobin-ab.wks"
 
+# Armada 3720 PCIe: load the Wi-Fi driver only when the card answers
+# (recipes-bsp/custos-pcie-guard).
+IMAGE_INSTALL:append:espressobin = " custos-pcie-guard"
+
 # A13 A/B updates: RAUC glue, kernel and DTB inside the root file system
 # (boot.scr loads them from /boot of the selected slot), and an ext4 image
 # of the root file system for the update bundle (custos-bundle).

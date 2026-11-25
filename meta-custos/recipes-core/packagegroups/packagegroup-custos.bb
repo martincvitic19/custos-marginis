@@ -17,11 +17,12 @@ RDEPENDS:${PN} = " \
     iproute2-bridge \
     iproute2-tc \
     jq \
+    packagegroup-custos-wifi \
     packagegroup-custos-vpn \
     packagegroup-custos-security \
 "
 
-PACKAGES += "packagegroup-custos-vpn packagegroup-custos-security"
+PACKAGES += "packagegroup-custos-vpn packagegroup-custos-wifi packagegroup-custos-security"
 
 # A10-A12: SELinux (permissive until the AVC log is clean), audit, IDS
 # (Suricata, sshguard, arpwatch, AIDE) and the XDP edge filter. procps: ps -Z
@@ -43,3 +44,20 @@ CUSTOS_XDP ?= "custos-bpf"
 # A7: WireGuard server (wg0) and Mullvad client (wg-mullvad).
 RDEPENDS:packagegroup-custos-vpn = "wireguard-tools"
 RRECOMMENDS:packagegroup-custos-vpn = "kernel-module-wireguard"
+
+# W-WIFI: Compex WLE900VX = Qualcomm Atheros QCA9880 (ath10k_pci), firmware
+# QCA988X hw2.0, signed regulatory database (country HR), hostapd for the
+# access point, iw for the ISP Wi-Fi scan.
+RDEPENDS:packagegroup-custos-wifi = " \
+    hostapd \
+    pciutils \
+    iw \
+    wireless-regdb-static \
+    linux-firmware-ath10k-qca988x \
+"
+RRECOMMENDS:packagegroup-custos-wifi = " \
+    kernel-module-ath10k-pci \
+    kernel-module-ath10k-core \
+    kernel-module-mac80211 \
+    kernel-module-cfg80211 \
+"
