@@ -29,6 +29,7 @@ SRC_URI = " \
     ${HAGEZI_RAW}/LICENSE;name=hagezi-license;downloadfilename=hagezi-dns-blocklists-LICENSE \
     file://custos-firewall.service \
     file://90-custos-router.conf \
+    file://91-custos-hardening.conf \
     file://networkd-requires-firewall.conf \
     file://dropbear-requires-firewall.conf \
 "
@@ -95,6 +96,7 @@ do_install() {
 
     install -d ${D}${nonarch_libdir}/sysctl.d
     install -m 0644 ${UNPACKDIR}/90-custos-router.conf ${D}${nonarch_libdir}/sysctl.d/
+    install -m 0644 ${UNPACKDIR}/91-custos-hardening.conf ${D}${nonarch_libdir}/sysctl.d/
 }
 
 PACKAGES =+ "${PN}-doh"
