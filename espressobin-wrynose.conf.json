@@ -29,6 +29,20 @@
                 "branch": "wrynose",
                 "rev": "c0fcd7cca3760ef24e087ac4a31b8f357cb204da"
             }
+        },
+        "meta-security": {
+            "git-remote": {
+                "uri": "https://git.yoctoproject.org/meta-security",
+                "branch": "wrynose",
+                "rev": "2703974d5e2d61b221dffa302c2e059a522adbf3"
+            }
+        },
+        "meta-clang": {
+            "git-remote": {
+                "uri": "https://github.com/kraj/meta-clang",
+                "branch": "wrynose",
+                "rev": "ef0d22f21910a0c30c967eeb17d8f209806e2d81"
+            }
         }
     },
     "bitbake-setup": {
@@ -41,7 +55,9 @@
                     "meta-yocto/meta-poky",
                     "meta-openembedded/meta-oe",
                     "meta-openembedded/meta-python",
-                    "meta-openembedded/meta-networking"
+                    "meta-openembedded/meta-networking",
+                    "meta-security",
+                    "meta-clang"
                 ],
                 "bb-layers-file-relative": [
                     "meta-espressobin",
