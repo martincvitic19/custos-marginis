@@ -1,0 +1,16 @@
+[Unit]
+Description=Custos apply (custos.json -> AdGuard Home, nft, DHCP, VPN, Wi-Fi)
+After=custos-apply-boot.service adguardhome.service systemd-networkd.service
+Wants=adguardhome.service
+RequiresMountsFor=/data/custos
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/custos-apply --mode=full
+# AdGuard Home may still be loading ~1.4 M rules; the timer would also
+# retry within a minute, but this unit should not stay "failed".
+Restart=on-failure
+RestartSec=20s
+
+[Install]
+WantedBy=multi-user.target

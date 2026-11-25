@@ -1,0 +1,8 @@
+[Unit]
+Description=Custos apply (timer: retry and curfew boundaries)
+After=custos-apply.service
+RequiresMountsFor=/data/custos
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/custos-apply --mode=retry

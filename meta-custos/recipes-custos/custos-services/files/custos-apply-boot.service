@@ -1,0 +1,20 @@
+[Unit]
+Description=Custos policy before networking (nft policy, networkd files)
+Documentation=file:///usr/share/doc/custos
+# After the base firewall, before any interface is configured: the role
+# and curfew policy is in place before the first client gets an address.
+DefaultDependencies=no
+After=local-fs.target systemd-tmpfiles-setup.service custos-firewall.service
+Requires=custos-firewall.service
+Before=network-pre.target systemd-networkd.service shutdown.target
+Wants=network-pre.target
+Conflicts=shutdown.target
+RequiresMountsFor=/data/custos
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/custos-apply --mode=boot
+
+[Install]
+WantedBy=multi-user.target
