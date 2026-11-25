@@ -1,0 +1,345 @@
+policy_module(custos, 1.0.0)
+
+########################################
+#
+# Custos Marginis services (A11). One domain per service; every allow rule
+# says why it exists. Built into refpolicy-targeted at build time (no
+# semanage/audit2allow on the device).
+#
+
+## Domains and entry points
+type custos_apply_t;
+type custos_apply_exec_t;
+init_daemon_domain(custos_apply_t, custos_apply_exec_t)
+
+type custosd_t;
+type custosd_exec_t;
+init_daemon_domain(custosd_t, custosd_exec_t)
+
+type custos_watch_t;
+type custos_watch_exec_t;
+init_daemon_domain(custos_watch_t, custos_watch_exec_t)
+
+type adguardhome_t;
+type adguardhome_exec_t;
+init_daemon_domain(adguardhome_t, adguardhome_exec_t)
+
+## Files
+# /data/custos: custos.json, state, secrets, event log
+type custos_conf_t;
+files_type(custos_conf_t)
+# /data/custos/wg: WireGuard private keys
+type custos_wg_key_t;
+files_type(custos_wg_key_t)
+# /data/custosd: admin password hash, TLS key
+type custosd_data_t;
+files_type(custosd_data_t)
+# /data/adguardhome: AdGuard Home state and query log
+type adguardhome_data_t;
+files_type(adguardhome_data_t)
+# /run/custos: generated nft policy, status, apply socket
+type custos_runtime_t;
+files_type(custos_runtime_t)
+
+########################################
+#
+# custosd: HTTPS API. Edits custos.json, asks custos-apply over a socket.
+# Must NOT read WireGuard keys (scenario S3) and must not run programs.
+#
+allow custosd_t self:capability net_bind_service;	# ports 80/443/8443
+allow custosd_t self:tcp_socket create_stream_socket_perms;
+allow custosd_t self:udp_socket create_socket_perms;	# cgnat-check (SSDP)
+allow custosd_t self:unix_stream_socket create_stream_socket_perms;
+allow custosd_t self:netlink_route_socket r_netlink_socket_perms;	# interface addresses
+corenet_tcp_bind_generic_node(custosd_t)
+corenet_tcp_bind_http_port(custosd_t)		# 80, 443, 8443
+corenet_tcp_connect_all_ports(custosd_t)	# AdGuard Home API 127.0.0.1:3000, cgnat echo 443
+corenet_udp_bind_generic_node(custosd_t)
+corenet_sendrecv_all_packets(custosd_t)
+allow custosd_t custos_conf_t:dir rw_dir_perms;		# atomic write of custos.json (tmp + rename)
+allow custosd_t custos_conf_t:file manage_file_perms;
+allow custosd_t custosd_data_t:dir rw_dir_perms;		# auth.json, TLS key on first start
+allow custosd_t custosd_data_t:file manage_file_perms;
+allow custosd_t custos_runtime_t:dir search_dir_perms;	# /run/custos/apply.json, apply.sock
+allow custosd_t custos_runtime_t:file read_file_perms;
+allow custosd_t custos_runtime_t:sock_file write_sock_file_perms;
+init_stream_connect(custosd_t)				# the socket is owned by systemd (Accept=yes)
+kernel_read_network_state(custosd_t)		# /proc/net/arp (devices on the LAN)
+kernel_read_system_state(custosd_t)		# /proc/uptime
+dev_read_sysfs(custosd_t)				# /sys/class/ieee80211, /sys/class/net
+dev_read_urand(custosd_t)				# tokens, TLS key
+miscfiles_read_localization(custosd_t)
+sysnet_dns_name_resolve(custosd_t)
+
+########################################
+#
+# custos-watch: counters, ARP sweep, Wi-Fi scan. Appends alerts.
+#
+allow custos_watch_t self:capability { net_admin net_raw };
+allow custos_watch_t self:packet_socket create_socket_perms;	# raw ARP
+allow custos_watch_t self:netlink_netfilter_socket create_socket_perms;	# nft -j list set
+allow custos_watch_t self:netlink_route_socket create_netlink_socket_perms;
+allow custos_watch_t self:netlink_generic_socket create_socket_perms;	# iw (nl80211)
+allow custos_watch_t self:udp_socket create_socket_perms;
+allow custos_watch_t custos_conf_t:dir rw_dir_perms;		# events.jsonl, prune
+allow custos_watch_t custos_conf_t:file manage_file_perms;
+corecmd_exec_bin(custos_watch_t)			# nft, iw (run in this domain)
+kernel_read_network_state(custos_watch_t)		# /proc/net/route
+dev_read_sysfs(custos_watch_t)
+miscfiles_read_localization(custos_watch_t)
+
+########################################
+#
+# AdGuard Home: DNS on 53, UI on 127.0.0.1:3000, DoH upstreams, lists.
+#
+allow adguardhome_t self:capability net_bind_service;
+allow adguardhome_t self:tcp_socket create_stream_socket_perms;
+allow adguardhome_t self:udp_socket create_socket_perms;
+allow adguardhome_t self:netlink_route_socket r_netlink_socket_perms;
+corenet_tcp_bind_generic_node(adguardhome_t)
+corenet_udp_bind_generic_node(adguardhome_t)
+corenet_tcp_bind_dns_port(adguardhome_t)
+corenet_udp_bind_dns_port(adguardhome_t)
+corenet_tcp_bind_all_unreserved_ports(adguardhome_t)	# 127.0.0.1:3000
+corenet_tcp_connect_all_ports(adguardhome_t)		# DoH 443, list downloads
+corenet_udp_sendrecv_all_ports(adguardhome_t)		# bootstrap DNS
+corenet_sendrecv_all_packets(adguardhome_t)
+allow adguardhome_t adguardhome_data_t:dir manage_dir_perms;
+allow adguardhome_t adguardhome_data_t:file manage_file_perms;
+kernel_read_network_state(adguardhome_t)
+kernel_read_system_state(adguardhome_t)
+dev_read_sysfs(adguardhome_t)
+dev_read_urand(adguardhome_t)
+files_read_etc_files(adguardhome_t)			# /etc/hosts
+miscfiles_read_localization(adguardhome_t)
+miscfiles_read_generic_certs(adguardhome_t)		# CA bundle for DoH
+sysnet_dns_name_resolve(adguardhome_t)
+
+########################################
+#
+# custos-apply: root reconciler. Manages its own files, runs nft,
+# networkctl, systemctl, conntrack. Rules from the AVC log of the full test
+# run (tests/A11-selinux.sh) are added below.
+#
+allow custos_apply_t self:capability { chown fowner fsetid dac_override net_admin };
+allow custos_apply_t self:unix_stream_socket create_stream_socket_perms;
+allow custos_apply_t self:tcp_socket create_stream_socket_perms;	# AdGuard Home API
+allow custos_apply_t self:udp_socket create_socket_perms;
+allow custos_apply_t custos_conf_t:dir manage_dir_perms;
+allow custos_apply_t custos_conf_t:file manage_file_perms;
+allow custos_apply_t custos_wg_key_t:dir manage_dir_perms;
+allow custos_apply_t custos_wg_key_t:file manage_file_perms;
+allow custos_apply_t custos_runtime_t:dir manage_dir_perms;
+allow custos_apply_t custos_runtime_t:file manage_file_perms;
+corenet_tcp_connect_all_ports(custos_apply_t)
+corenet_sendrecv_all_packets(custos_apply_t)
+corecmd_exec_bin(custos_apply_t)
+kernel_read_network_state(custos_apply_t)
+kernel_read_system_state(custos_apply_t)
+dev_read_sysfs(custos_apply_t)
+dev_read_urand(custos_apply_t)
+files_read_etc_files(custos_apply_t)
+miscfiles_read_localization(custos_apply_t)
+
+# --- From the AVC log of the first A/B image boot and full test run
+# --- (2026-11-21, tests/run-all.sh + tests/A11-selinux.sh collect).
+gen_require(`
+	type systemd_networkd_t, systemd_networkd_runtime_t;
+	type system_dbusd_runtime_t;
+	type initrc_runtime_t, mount_t, iptables_t, hostapd_t;
+	type systemd_generator_t, systemd_journal_init_t, systemd_journal_t;
+	type systemd_userdbd_t, systemd_userdbd_runtime_t, etc_runtime_t;
+	type syslogd_runtime_t, local_login_t, system_dbusd_t, arpwatch_t;
+	type syslogd_t, klogd_t, dmesg_t, mount_runtime_t;
+	type ifconfig_exec_t, bin_t;
+	type systemd_unit_t, initrc_t;
+	type var_t, var_lib_t, var_spool_t, avahi_t, init_var_lib_t;
+	class service { start stop status };
+	class dbus send_msg;
+')
+
+## All Go services: the runtime reads its own scheduling policy and signals
+## its own threads (goroutine preemption uses SIGURG).
+allow { custos_apply_t custosd_t custos_watch_t adguardhome_t } self:process { getsched signal signull };
+## Every service reaches its state under /data (labelled var_lib_t, see .fc).
+files_search_var_lib({ custos_apply_t custosd_t custos_watch_t adguardhome_t })
+## Go net reads /proc/sys/net/core/somaxconn; "ip"/netlink may ask the kernel
+## to autoload a protocol module (signed modules only, MODULE_SIG_FORCE).
+kernel_read_net_sysctls({ custosd_t adguardhome_t })
+kernel_request_load_module({ custos_apply_t custosd_t adguardhome_t })
+
+## custos-apply
+# Writes the generated networkd files (wg0 netdev, Wi-Fi network) atomically
+# (tmp + rename) into /run/systemd/network; refpolicy has no manage interface.
+allow custos_apply_t systemd_networkd_runtime_t:dir rw_dir_perms;
+allow custos_apply_t systemd_networkd_runtime_t:file { manage_file_perms setattr };
+# networkctl reload: varlink to networkd, D-Bus fallback, reads init state.
+systemd_stream_connect_networkd(custos_apply_t)
+dbus_system_bus_client(custos_apply_t)
+systemd_dbus_chat_networkd(custos_apply_t)
+init_read_state(custos_apply_t)
+fs_getattr_nsfs_files(custos_apply_t)
+kernel_read_kernel_sysctls(custos_apply_t)
+# systemctl restart hostapd/adguardhome: talks to PID 1.
+init_stream_connect(custos_apply_t)
+kernel_getattr_proc(custos_apply_t)
+# nft (policy fragment) and conntrack -D (curfew) run in this domain.
+iptables_exec(custos_apply_t)
+allow custos_apply_t self:netlink_netfilter_socket create_socket_perms;
+allow custos_apply_t self:fifo_file rw_fifo_file_perms;	# pipes to nft/networkctl
+allow custos_apply_t self:udp_socket node_bind;		# cgnat check (UPnP SSDP)
+corenet_udp_bind_generic_node(custos_apply_t)
+# HTTPS to the AdGuard Home API and the CGNAT echo: CA bundle, resolv.conf.
+miscfiles_read_generic_certs(custos_apply_t)
+sysnet_read_config(custos_apply_t)
+systemd_read_resolved_runtime(custos_apply_t)
+files_read_usr_files(custos_apply_t)		# /usr/share (zoneinfo, lists)
+
+## custos-watch: runs nft (counter sets) and iw (ISP Wi-Fi scan) in its domain.
+iptables_exec(custos_watch_t)
+allow custos_watch_t ifconfig_exec_t:file { exec_file_perms map };
+allow custos_watch_t self:fifo_file rw_fifo_file_perms;
+allow custos_watch_t self:unix_dgram_socket { create ioctl };	# iw
+dev_read_urand(custos_watch_t)				# nft
+
+## AdGuard Home
+# Go os.TempDir(): list update writes a temp file in /tmp (PrivateTmp).
+files_manage_generic_tmp_dirs(adguardhome_t)
+files_manage_generic_tmp_files(adguardhome_t)
+allow adguardhome_t adguardhome_data_t:file map;	# bbolt stats/querylog db
+corecmd_search_bin(adguardhome_t)			# exec.LookPath at start
+allow adguardhome_t bin_t:lnk_file read_lnk_file_perms;	# /sbin -> /usr/sbin
+files_read_usr_files(adguardhome_t)
+files_watch_etc_dirs(adguardhome_t)			# /etc/hosts watcher
+
+## Other domains touching Custos objects
+# networkd reads the WireGuard private key (PrivateKeyFile=); only it,
+# custos-apply and nobody else (custosd must not, scenario S3).
+allow systemd_networkd_t custos_wg_key_t:dir search_dir_perms;
+allow systemd_networkd_t custos_wg_key_t:file read_file_perms;
+allow systemd_networkd_t custos_conf_t:dir search_dir_perms;
+files_search_var_lib(systemd_networkd_t)
+# nft -f /etc/custos/firewall.nft includes /run/custos/firewall/*.nft.
+allow iptables_t custos_runtime_t:dir list_dir_perms;
+allow iptables_t custos_runtime_t:file read_file_perms;
+allow iptables_t custos_runtime_t:file ioctl;
+# hostapd -B /run/custos/hostapd.conf (generated by custos-apply).
+allow hostapd_t custos_runtime_t:dir search_dir_perms;
+allow hostapd_t custos_runtime_t:file read_file_perms;
+# custos-boot-guard mounts the boot partition on /run/custos/bootpart; the
+# script creates it before tmpfiles runs, so it can still be initrc_runtime_t.
+allow mount_t { custos_runtime_t initrc_runtime_t }:dir mounton;
+# A10 read-only root: volatile-binds bind-mounts tmpfs copies over /var/lib,
+# /var/cache, /var/spool and /srv (copy+bind, not overlayfs: an overlay runs
+# its upper-layer operations with mount_t's credentials and came up
+# read-only, "failed to create directory .../work (errno: 13)").
+allow mount_t { var_t var_lib_t var_spool_t }:dir mounton;
+# custos-timesync-data binds /data/timesync over /var/lib/systemd/timesync.
+allow mount_t init_var_lib_t:dir mounton;
+allow iptables_t initrc_runtime_t:dir search_dir_perms;
+
+########################################
+#
+# Base policy gaps on this distro (refpolicy 2.20260312 with systemd 258 and
+# busybox syslog/klogd). Not Custos objects; kept here instead of patching
+# meta-selinux. Report upstream.
+#
+# busybox syslogd/klogd/dmesg are applets of /bin/busybox (bin_t).
+corecmd_exec_bin({ syslogd_t klogd_t dmesg_t })
+# /dev/log is a symlink to /run/systemd/journal/dev-log, which the policy
+# labels syslogd_runtime_t instead of devlog_t.
+allow { local_login_t system_dbusd_t arpwatch_t klogd_t avahi_t } syslogd_runtime_t:sock_file write_sock_file_perms;
+# journalctl --flush / catalog (systemd-journal-flush.service) resolves users
+# over userdb and reads machine-id.
+systemd_stream_connect_userdb(systemd_journal_init_t)
+systemd_read_userdb_runtime_files(systemd_journal_init_t)
+systemd_list_userdb_runtime_dirs(systemd_journal_init_t)
+allow systemd_journal_init_t systemd_userdbd_runtime_t:lnk_file read_lnk_file_perms;
+files_read_etc_files(systemd_journal_init_t)
+files_read_etc_runtime_files(systemd_journal_init_t)
+allow systemd_journal_init_t systemd_journal_t:dir watch;
+allow systemd_journal_init_t systemd_journal_t:file map;
+init_stream_connect(systemd_journal_init_t)
+# networkd: DHCP server on the VLAN bridges (udp 67), and /run/mount/utab.
+corenet_udp_bind_dhcpd_port(systemd_networkd_t)
+mount_read_runtime_files(systemd_networkd_t)
+# arpwatch: nl80211 probe at start and mmap of its capture ring.
+allow arpwatch_t self:netlink_generic_socket { create ioctl };
+allow arpwatch_t self:packet_socket map;
+
+## custos-apply starts/stops custos-hostapd.service (packaged unit,
+## systemd_unit_t) when the Wi-Fi settings change.
+allow custos_apply_t systemd_unit_t:service { start stop status };
+## custosd: Go's mime package reads /usr/share/mime/globs2 at start.
+files_read_usr_files(custosd_t)
+## networkd answers D-Bus calls (networkctl) from admin shells. dropbear runs
+## its sessions as initrc_t (no sshd_exec_t label for dropbear in refpolicy).
+allow systemd_networkd_t initrc_t:dbus send_msg;
+## hostapd asks for a netdevice module autoload (dev_load) on restart: the
+## request is harmless to refuse, keep it out of the log.
+dontaudit hostapd_t self:capability sys_module;
+## networkd stats /dev/log (systemd's syslog fallback check) on every log
+## burst; only getattr, it logs to the journal.
+allow systemd_networkd_t syslogd_runtime_t:sock_file getattr;
+## dmesg: libselinux reads /proc/filesystems to find selinuxfs; not needed.
+kernel_dontaudit_read_system_state(dmesg_t)
+
+########################################
+#
+# custos-xdp: loads the XDP edge filter and writes its counters (A12).
+#
+# Enforcing like every other domain. The rules follow what the script and
+# bpftool do.
+#
+type custos_bpf_t;
+type custos_bpf_exec_t;
+init_daemon_domain(custos_bpf_t, custos_bpf_exec_t)
+
+gen_require(`
+	type lib_t, ifconfig_t;
+	class bpf { map_create map_read map_write prog_load prog_run };
+')
+allow custos_bpf_t self:bpf { map_create map_read map_write prog_load prog_run };
+allow custos_bpf_t self:capability { net_admin sys_resource };	# attach; bpftool raises RLIMIT_MEMLOCK
+# "bpftool map dump" looks the map's BTF up by id (BPF_BTF_GET_FD_BY_ID),
+# which the kernel allows only with CAP_SYS_ADMIN. The type rules of this
+# domain still limit what it can reach.
+allow custos_bpf_t self:capability sys_admin;
+allow custos_bpf_t self:process { getsched setrlimit };
+allow custos_bpf_t self:unix_dgram_socket { create ioctl };	# interface name -> index
+allow custos_bpf_t self:capability2 { bpf perfmon };	# load program, LPM maps
+allow custos_bpf_t self:netlink_route_socket create_netlink_socket_perms;	# bpftool net attach
+allow custos_bpf_t self:fifo_file rw_fifo_file_perms;	# pipes in the script
+allow custos_bpf_t custos_runtime_t:dir manage_dir_perms;	# batch files, xdp-stats.json
+allow custos_bpf_t custos_runtime_t:file manage_file_perms;
+fs_manage_bpf_dirs(custos_bpf_t)		# pins in /sys/fs/bpf/custos
+fs_manage_bpf_files(custos_bpf_t)
+fs_getattr_bpf(custos_bpf_t)			# bpftool checks that the pin path is bpffs
+files_search_runtime(custos_bpf_t)		# /run
+files_runtime_filetrans(custos_bpf_t, custos_runtime_t, dir, "custos")
+libs_read_lib_files(custos_bpf_t)		# /usr/lib/custos/bpf
+allow custos_bpf_t lib_t:file map;		# libelf maps the BPF objects
+files_read_etc_files(custos_bpf_t)
+miscfiles_read_localization(custos_bpf_t)	# date
+dev_read_urand(custos_bpf_t)
+kernel_read_kernel_sysctls(custos_bpf_t)
+corecmd_exec_bin(custos_bpf_t)			# bpftool, busybox
+corecmd_exec_shell(custos_bpf_t)
+kernel_read_system_state(custos_bpf_t)
+dev_read_sysfs(custos_bpf_t)
+# "ip link show" gets the attached program by id (reading, not loading).
+allow ifconfig_t custos_bpf_t:bpf prog_run;
+
+# systemd-networkd stats its masked /dev/kmsg (inaccessible node from /run).
+gen_require(`
+	type init_runtime_t;
+')
+allow systemd_networkd_t init_runtime_t:chr_file getattr;
+# Denied on purpose, only not logged (both seen in the test run, harmless):
+# "ip link show" probes CAP_BPF (the read works without it), and custos-xdp
+# started by hand over SSH looks at its working directory /root.
+gen_require(`
+	type user_home_dir_t;
+')
+dontaudit ifconfig_t self:capability2 bpf;
+dontaudit custos_bpf_t user_home_dir_t:dir { getattr search };
