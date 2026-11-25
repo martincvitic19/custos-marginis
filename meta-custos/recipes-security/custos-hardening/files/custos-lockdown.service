@@ -1,0 +1,19 @@
+[Unit]
+Description=Kernel lockdown (integrity) after boot
+Documentation=man:kernel_lockdown(7)
+# Late: after the firewall modules are loaded. From here on even root
+# cannot write kernel memory (/dev/mem, kexec of unsigned kernels, ...).
+# One way: only a reboot turns it off. Not in custos-image-baseline.
+After=multi-user.target custos-apply.service
+ConditionPathExists=/sys/kernel/security/lockdown
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# Fallback only: boot.scr already passes lockdown=integrity, and the kernel
+# refuses (EPERM) to set a level that is already active. Succeed when the
+# active level (in brackets) is integrity or confidentiality.
+ExecStart=/bin/sh -c 'grep -qF -e "[integrity]" -e "[confidentiality]" /sys/kernel/security/lockdown || echo integrity > /sys/kernel/security/lockdown'
+
+[Install]
+WantedBy=multi-user.target
