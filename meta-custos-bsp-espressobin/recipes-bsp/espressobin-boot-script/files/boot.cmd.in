@@ -1,0 +1,38 @@
+# Custos A/B boot script (A13) for the factory U-Boot 2017.03, sourced by
+#   ext4load mmc 0:1 0x6d00000 boot.scr; source 0x6d00000
+# custos-boot.env on the boot partition selects the root slot (written by
+# RAUC through custos-bootchooser); kernel and DTB come from /boot of that
+# slot, so an update replaces both together. Nothing is written here: the
+# factory U-Boot environment in SPI NOR is never changed (no saveenv).
+# The root file system is mounted read-only (A10, dm-verity hash appended):
+# a read-write mount would rewrite the ext4 superblock. Older images whose
+# fstab says "defaults" are remounted read-write by systemd as before.
+# Updated by RAUC (custos-rauc-post-install) from the bundle.
+setenv kernel_addr_r 0x7000000
+setenv fdt_addr_r 0x6f00000
+setenv slotenv_addr 0x6c00000
+
+mmc dev 0
+setenv CUSTOS_SLOT A
+if ext4load mmc 0:1 ${slotenv_addr} custos-boot.env; then
+    env import -t ${slotenv_addr} ${filesize}
+fi
+if test "${CUSTOS_SLOT}" = "B"; then
+    setenv rootpart 3
+else
+    setenv rootpart 2
+fi
+part uuid mmc 0:${rootpart} rootuuid
+setenv bootargs "console=ttyMV0,115200 earlycon=ar3700_uart,0xd0012000 root=PARTUUID=${rootuuid} rootfstype=ext4 rootwait ro pcie_aspm=off lockdown=integrity panic=10"
+
+echo "Custos: slot ${CUSTOS_SLOT} (mmc 0:${rootpart}), root=PARTUUID=${rootuuid}"
+ext4load mmc 0:${rootpart} ${kernel_addr_r} /boot/@KERNEL_IMAGETYPE@
+ext4load mmc 0:${rootpart} ${fdt_addr_r} /boot/@DTB@
+booti ${kernel_addr_r} - ${fdt_addr_r}
+# Slot unreadable: try the other one.
+if test "${rootpart}" = "2"; then setenv rootpart 3; else setenv rootpart 2; fi
+part uuid mmc 0:${rootpart} rootuuid
+setenv bootargs "console=ttyMV0,115200 earlycon=ar3700_uart,0xd0012000 root=PARTUUID=${rootuuid} rootfstype=ext4 rootwait ro pcie_aspm=off lockdown=integrity panic=10"
+ext4load mmc 0:${rootpart} ${kernel_addr_r} /boot/@KERNEL_IMAGETYPE@
+ext4load mmc 0:${rootpart} ${fdt_addr_r} /boot/@DTB@
+booti ${kernel_addr_r} - ${fdt_addr_r}
