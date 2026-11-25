@@ -1,0 +1,87 @@
+openapi: 3.0.3
+info:
+  title: custosd API
+  version: 0.1.0
+  description: |
+    Management API of Custos (A5). HTTPS on the admin VLAN gateway
+    (https://192.168.20.1, :443 and :8443) and on the VPN address
+    (192.168.40.1). Not reachable from the children's/guest VLANs or wan.
+
+    Authentication: `Authorization: Bearer <token>` (API clients) or the
+    `custos_session` cookie (web UI). With the cookie, every non-GET request
+    also needs `X-CSRF-Token` (returned by /api/login). Bodies are
+    `application/json`; unknown fields are rejected (400). Five wrong
+    passwords from one address within 15 minutes → 429 for 15 minutes.
+
+    Changes are written to /data/custos/custos.json and applied by
+    custos-apply (root) through /run/custos/apply.sock; custosd itself has no
+    root and runs no commands.
+servers:
+  - url: https://192.168.20.1:8443
+components:
+  securitySchemes:
+    bearer: {type: http, scheme: bearer}
+    cookie: {type: apiKey, in: cookie, name: custos_session}
+  schemas:
+    Error: {type: object, properties: {error: {type: string}}}
+    Schedule:
+      type: object
+      properties:
+        days: {type: array, items: {type: string, enum: [sun, mon, tue, wed, thu, fri, sat]}}
+        from: {type: string, example: "21:00"}
+        to: {type: string, example: "07:00"}
+    Device:
+      type: object
+      required: [name, mac, vlan, role]
+      properties:
+        name: {type: string, maxLength: 40}
+        mac: {type: string, example: "02:11:22:33:44:55"}
+        vlan: {type: integer, example: 10}
+        role: {type: string, enum: [child, guest, trusted, unfiltered]}
+        schedules: {type: array, items: {$ref: '#/components/schemas/Schedule'}}
+        strict_egress: {type: boolean}
+security: [{bearer: []}, {cookie: []}]
+paths:
+  /api/setup:
+    get: {security: [], summary: "First-run state {password_set, wizard_done}", responses: {'200': {description: ok}}}
+    post:
+      security: []
+      summary: Set the first admin password (min. 10 characters); logs in. 409 once a password exists.
+      requestBody: {content: {application/json: {schema: {type: object, properties: {password: {type: string}}}}}}
+      responses: {'200': {description: "{token, csrf, expires}"}, '400': {description: too short}, '409': {description: already set}}
+  /api/login:
+    post:
+      security: []
+      requestBody: {content: {application/json: {schema: {type: object, properties: {password: {type: string}}}}}}
+      responses: {'200': {description: "{token, csrf, expires} + cookie"}, '401': {description: wrong password}, '429': {description: rate limited}}
+  /api/logout: {post: {responses: {'200': {description: ok}}}}
+  /api/password: {post: {summary: "Change password {old, new}; ends all sessions", responses: {'200': {description: ok}}}}
+  /api/status: {get: {summary: "AdGuard Home state, last apply, alerts of the last 24 h, wan address, radio", responses: {'200': {description: ok}, '401': {description: no token}}}}
+  /api/devices:
+    get: {summary: "Known devices + devices seen on the LAN (unknown = child) with IP, role, curfew now", responses: {'200': {description: ok}}}
+    post:
+      summary: Add or update a device (matched by name or MAC+VLAN)
+      requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Device'}}}}
+      responses: {'200': {description: ok}, '400': {description: invalid, e.g. trusted outside the admin VLAN}, '403': {description: CSRF}}
+  /api/devices/{name}:
+    delete: {parameters: [{name: name, in: path, required: true, schema: {type: string}}], responses: {'200': {description: ok}}}
+  /api/devices/{name}/role:
+    post: {summary: "{role}", parameters: [{name: name, in: path, required: true, schema: {type: string}}], responses: {'200': {description: ok}}}
+  /api/roles: {get: {responses: {'200': {description: roles from custos.json}}}}
+  /api/roles/{role}: {put: {summary: "Replace a role (filtering, safesearch, blocked_services, strict_egress, schedules)", parameters: [{name: role, in: path, required: true, schema: {type: string}}], responses: {'200': {description: ok}}}}
+  /api/curfew/override:
+    post:
+      summary: "More time during a curfew: {device, minutes 0..240}; 0 cancels. Expires by itself."
+      responses: {'200': {description: "{device, until}"}}
+  /api/filtering: {get: {responses: {'200': {description: ok}}}, put: {summary: "Replace filtering (safesearch, lists, rules, update_interval_hours)", responses: {'200': {description: ok}}}}
+  /api/filtering/check: {get: {summary: "?domain=&client= : AdGuard Home check_host", responses: {'200': {description: ok}}}}
+  /api/querylog: {get: {summary: "?hours=1..168 : per-device totals, blocked count, top 5 blocked domains (no full history)", responses: {'200': {description: ok}}}}
+  /api/apply: {post: {summary: Run custos-apply now, responses: {'200': {description: status}}}}
+  /api/connection: {get: {summary: "wan address, internet reachable, Mullvad up; ?cgnat=1 runs the CGNAT check", responses: {'200': {description: ok}}}}
+  /api/events: {get: {summary: "?limit= : event log (alerts, applies, logins), 30 days", responses: {'200': {description: ok}}}}
+  /api/events.csv: {get: {summary: CSV export for an incident report (GDPR art. 33), responses: {'200': {description: text/csv}}}}
+  /api/vpn: {get: {responses: {'200': {description: "vpn section + server public key"}}}, put: {summary: "{enabled, endpoint, exit, port}", responses: {'200': {description: ok}}}}
+  /api/vpn/peers: {post: {summary: "{name, role} -> {config, qr_png}; the private key is not stored", responses: {'200': {description: ok}}}}
+  /api/vpn/peers/{name}: {delete: {parameters: [{name: name, in: path, required: true, schema: {type: string}}], responses: {'200': {description: ok}}}}
+  /api/wifi: {get: {summary: "wifi section, SSIDs with passphrases, radio present", responses: {'200': {description: ok}}}, put: {summary: Replace the wifi section, responses: {'200': {description: ok}}}}
+  /api/wizard: {get: {summary: "ISP checklist state + automatic checks", responses: {'200': {description: ok}}}, put: {summary: "{done, steps}", responses: {'200': {description: ok}}}}
