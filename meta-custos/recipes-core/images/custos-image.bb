@@ -16,3 +16,9 @@ IMAGE_INSTALL:remove = "espressobin-network"
 # on the device uses it; copy files with "scp -O" (legacy SCP protocol, served
 # by dropbear itself) or "ssh ... 'cat > file' < file".
 BAD_RECOMMENDATIONS += "openssh-sftp-server"
+
+# mDNS name custos.local (systemd-resolved answers on the admin VLAN).
+ROOTFS_POSTPROCESS_COMMAND += "custos_hostname;"
+custos_hostname() {
+    echo custos > ${IMAGE_ROOTFS}${sysconfdir}/hostname
+}
