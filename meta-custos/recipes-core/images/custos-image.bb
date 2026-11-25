@@ -30,3 +30,14 @@ ROOTFS_POSTPROCESS_COMMAND += "custos_hostname;"
 custos_hostname() {
     echo custos > ${IMAGE_ROOTFS}${sysconfdir}/hostname
 }
+
+# The vulnerable custosd (conf/custos-demo.conf, scenario S3) may only end up
+# in custos-image-demo, and that image only exists with that configuration.
+python () {
+    demo_conf = d.getVar("CUSTOS_DEMO") == "1"
+    demo_image = d.getVar("PN") == "custos-image-demo"
+    if demo_conf and not demo_image:
+        raise bb.parse.SkipRecipe("CUSTOS_DEMO is set: only custos-image-demo may be built")
+    if demo_image and not demo_conf:
+        raise bb.parse.SkipRecipe("build with: bitbake -R conf/custos-demo.conf custos-image-demo")
+}
