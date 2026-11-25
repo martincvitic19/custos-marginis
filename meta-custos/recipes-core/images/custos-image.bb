@@ -4,6 +4,9 @@ DESCRIPTION = "Complete software image for Custos Marginis."
 IMAGE_INSTALL = "${CORE_IMAGE_BASE_INSTALL}"
 
 inherit core-image
+# A11: label every file at build time (setfiles), so the first boot already
+# runs with the right SELinux contexts (no relabel reboot).
+inherit ${@bb.utils.contains('DISTRO_FEATURES', 'selinux', 'selinux-image', '', d)}
 
 CORE_IMAGE_EXTRA_INSTALL += "packagegroup-custos"
 
