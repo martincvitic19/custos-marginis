@@ -42,7 +42,7 @@ espressobin-yocto/
 │   ├── host-setup.sh              one-time host setup (needs sudo)
 │   ├── setup-build.sh             fetch layers, create the build directory
 │   └── netboot.sh                 TFTP + NFS servers for the board
-└── docs/uboot-env-backup.txt      factory U-Boot environment of the reference board
+└── docs/                          design notes, scenarios and live demo
 ```
 
 These are generated and ignored by git: `build/`, `layers/`, `downloads/`,

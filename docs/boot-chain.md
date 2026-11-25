@@ -40,7 +40,7 @@ What is enforced now (custos-image, not custos-image-baseline):
 |-----------|--------|--------------------|
 | Boot **from** the dm-verity device (phase 2) | **prepared, not enabled** | `CUSTOS_<slot>_DM` in custos-boot.env already holds the `dm-mod.create=` table. Remaining: `CONFIG_DM_INIT=y`, boot.scr passing `dm-mod.create="${CUSTOS_x_DM}" root=/dev/dm-0`. Needs you on the serial console for the first boot (a wrong table stops the boot before userspace, and the Linux-side boot counting cannot see that; `panic=10` reboots into the same slot). |
 | Root hash in a signed FIT | **not done** | Without it the root hash in custos-boot.env is only as trustworthy as the boot partition. Needs a FIT image and a U-Boot that verifies it; replacing the factory U-Boot means writing SPI NOR (only you, with a UART recovery plan: `mox-imager`/`wtpdownloader`). |
-| U-Boot `bootdelay=0`, read-only env | **not done** | SPI NOR. Commands for you, when you decide (keep a backup, docs/uboot-env-backup.txt): `setenv bootdelay 0; saveenv` (only on the serial console; not run by me). |
+| U-Boot `bootdelay=0`, read-only env | **not done** | SPI NOR. Back up the environment first, then `setenv bootdelay 0; saveenv` (only on the serial console; not run). |
 | AIDE | **done** (A12 stage) | custos-ids: /usr/bin, /usr/sbin, units, sysctl, modprobe, /etc/custos, CA bundle, passwd/shadow, WireGuard keys, admin password hash; checked every 6 h, changes → alert in the UI |
 | LKRG | **not enabled** | meta-security has lkrg-module 0.9.7; not verified against kernel 6.18, and out-of-tree modules must also be signed now (MODULE_SIG_FORCE). Next step after A13. |
 
