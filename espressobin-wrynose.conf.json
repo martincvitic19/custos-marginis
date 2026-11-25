@@ -43,6 +43,13 @@
                 "branch": "wrynose",
                 "rev": "ef0d22f21910a0c30c967eeb17d8f209806e2d81"
             }
+        },
+        "meta-selinux": {
+            "git-remote": {
+                "uri": "https://git.yoctoproject.org/meta-selinux",
+                "branch": "wrynose",
+                "rev": "83b742346d5aac41ad9a7a5cb07c3a698e89eb11"
+            }
         }
     },
     "bitbake-setup": {
@@ -57,6 +64,7 @@
                     "meta-openembedded/meta-python",
                     "meta-openembedded/meta-networking",
                     "meta-security",
+                    "meta-selinux",
                     "meta-clang"
                 ],
                 "bb-layers-file-relative": [
