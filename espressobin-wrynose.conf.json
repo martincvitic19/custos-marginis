@@ -50,6 +50,13 @@
                 "branch": "wrynose",
                 "rev": "83b742346d5aac41ad9a7a5cb07c3a698e89eb11"
             }
+        },
+        "meta-rauc": {
+            "git-remote": {
+                "uri": "https://github.com/rauc/meta-rauc",
+                "branch": "wrynose",
+                "rev": "38da0e5866a953e664001ba90b5edad68d68cd5d"
+            }
         }
     },
     "bitbake-setup": {
@@ -65,7 +72,8 @@
                     "meta-openembedded/meta-networking",
                     "meta-security",
                     "meta-selinux",
-                    "meta-clang"
+                    "meta-clang",
+                    "meta-rauc"
                 ],
                 "bb-layers-file-relative": [
                     "meta-espressobin",
