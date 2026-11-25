@@ -1,0 +1,14 @@
+[Unit]
+Description=Custos XDP edge filter on eth0 (A12)
+After=network-pre.target custos-firewall.service
+Before=systemd-networkd.service
+RequiresMountsFor=/sys/fs/bpf
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/custos-xdp start
+ExecStop=/usr/sbin/custos-xdp stop
+
+[Install]
+WantedBy=multi-user.target
