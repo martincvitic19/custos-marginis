@@ -1,5 +1,5 @@
 {
-    "description": "Globalscale ESPRESSObin on Yocto Project 6.0 LTS 'wrynose' (Poky reference distro, systemd)",
+    "description": "Globalscale ESPRESSObin on Yocto Project 6.0 LTS 'wrynose' (Custos distro, systemd)",
     "expires": "2030-04-30",
     "sources": {
         "bitbake": {
@@ -35,7 +35,7 @@
         "configurations": [
             {
                 "name": "espressobin",
-                "description": "ESPRESSObin core-image-minimal (yocto-6.0.4)",
+                "description": "ESPRESSObin custos-image (yocto-6.0.4)",
                 "bb-layers": [
                     "openembedded-core/meta",
                     "meta-yocto/meta-poky",
@@ -45,11 +45,14 @@
                 ],
                 "bb-layers-file-relative": [
                     "meta-espressobin",
-                    "meta-espressobin-image"
+                    "meta-espressobin-image",
+                    "meta-custos-distro",
+                    "meta-custos",
+                    "meta-custos-bsp-espressobin"
                 ],
                 "oe-fragments": [
                     "machine/espressobin",
-                    "distro/poky"
+                    "distro/custos"
                 ],
                 "setup-dir-name": "espressobin-wrynose"
             }
