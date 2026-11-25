@@ -1,0 +1,14 @@
+# short-description: Custos microSD with A/B root slots (A13, RAUC)
+# Partition 1: boot (boot.scr; custos-boot.env selects the slot)
+# Partition 2: root slot A   Partition 3: root slot B (same size)
+# Partition 4: /data (persistent, mounted by LABEL=data from the fstab that
+#   base-files installs; wic must not rewrite fstab: --no-fstab-update, and
+#   no mount point on p4, see base-files_%.bbappend)
+# The kernel and DTB are loaded from /boot inside the selected root slot,
+# so a RAUC update replaces kernel and root file system together.
+part --source bootimg_partition --ondisk mmcblk0 --fstype=ext4 --label boot --active --align 4096 --size 64
+part / --source rootfs --ondisk mmcblk0 --fstype=ext4 --label root_a --align 4096 --fixed-size 1536M --no-fstab-update
+part --ondisk mmcblk0 --fstype=ext4 --label root_b --align 4096 --fixed-size 1536M
+part --ondisk mmcblk0 --fstype=ext4 --label data --align 4096 --size 512
+
+bootloader --ptable msdos
