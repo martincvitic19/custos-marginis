@@ -1,0 +1,45 @@
+#!/bin/sh
+# Initialise the AIDE database on the first run, then compare. Any
+# difference becomes an alert in the Custos event log (UI overview).
+#
+# /data is shared by both A/B slots, so there is one database per installed
+# root file system, named after the RAUC bundle version of the booted slot
+# (the wic-flashed first slot has none: "factory"). A signed update thus
+# starts a new baseline instead of reporting every updated file as an
+# intrusion (seen 2026-11-21: 1120 "changed" entries after rauc install).
+# aide.conf reads /data/aide/aide.db, a symlink to the current database.
+D=/data/aide
+CONF=/etc/custos/aide.conf
+EVENTS=/data/custos/events.jsonl
+mkdir -p $D
+
+versions=$(rauc status --detailed --output-format=json 2>/dev/null |
+    jq -r '.slots[] | to_entries[] | .value | [.state, (.slot_status.bundle.version // "")] | @tsv' 2>/dev/null)
+ver=$(echo "$versions" | awk -F'\t' '$1=="booted"{print $2}')
+ver=$(echo "${ver:-factory}" | tr -c 'A-Za-z0-9._\n-' '_')
+DB=$D/aide-$ver.db
+ln -sfn "aide-$ver.db" $D/aide.db
+
+# Drop databases of root file systems that are in neither slot any more.
+keep=$(echo "$versions" | awk -F'\t' '{print ($2=="" ? "factory" : $2)}' | tr -c 'A-Za-z0-9._\n-' '_')
+for f in $D/aide-*.db; do
+    [ -e "$f" ] || continue
+    v=${f#$D/aide-}; v=${v%.db}
+    echo "$keep" | grep -qxF "$v" || rm -f "$f"
+done
+
+if [ ! -s $DB ]; then
+    aide -c $CONF --init >/dev/null 2>&1 && mv $D/aide.db.new $DB
+    command -v restorecon >/dev/null && restorecon -R $D
+    echo "aide: database initialised for root file system $ver"
+    exit 0
+fi
+out=$(aide -c $CONF --check 2>&1); rc=$?
+if [ $rc -ne 0 ]; then
+    # AIDE 0.19 summary: "Added entries: N", "Removed entries: N", "Changed entries: N".
+    n=$(echo "$out" | awk -F: '/^ *(Added|Removed|Changed) entries:/ {s += $2} END {print s+0}')
+    printf '{"time":"%s","kind":"integrity","severity":"alert","message":"AIDE: %s promjena u zaštićenim datotekama (aide --check)"}\n' \
+        "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$n" >> $EVENTS
+    echo "$out" | sed -n 1,40p
+fi
+exit 0
