@@ -1,0 +1,35 @@
+#!/bin/sh
+# sshguard PARSER for dropbear. sshguard 2.5 has no dropbear patterns at all
+# (found 2026-11-22: six failed logins, nothing blocked).
+# in:  dropbear messages without prefix (journalctl -o cat -t dropbear)
+# out: "<service> <address> <4|6> <score>" as sshg-parser prints (100 = ssh)
+# Score: 10 for a failed login, 2 for a connection closed before login.
+# Every pattern is anchored to the start of the message and the address comes
+# from a place the client cannot fill, so a user name cannot get another
+# address blocked. Shell builtins only: no buffering in the pipe.
+while IFS= read -r line; do
+    score=10
+    case $line in
+    "Login attempt for nonexistent user from "*)
+        a=${line#"Login attempt for nonexistent user from "} ;;
+    "Bad password attempt for "*" from "*)
+        a=${line##* from } ;;
+    "Exit before auth from <"*">: "*)
+        a=${line#"Exit before auth from <"}
+        a=${a%%">"*}
+        case ${line#"Exit before auth from <$a>: "} in
+        "(user '"*) ;;          # tried to log in and failed
+        *) score=2 ;;
+        esac ;;
+    *) continue ;;
+    esac
+    a=${a%:*}                   # port
+    case $a in ::ffff:*.*) a=${a#::ffff:} ;; esac
+    case $a in
+    ''|*[!0-9a-f.:]*) continue ;;
+    *:*) kind=6 ;;
+    *.*.*.*) kind=4 ;;
+    *) continue ;;
+    esac
+    echo "100 $a $kind $score"
+done

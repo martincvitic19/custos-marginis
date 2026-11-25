@@ -1,0 +1,32 @@
+[Unit]
+Description=Suricata IDS on the LAN bridge (Custos, A12)
+Documentation=file:///usr/share/doc/custos-ids
+After=network.target systemd-networkd.service
+Wants=network.target
+RequiresMountsFor=/data/suricata
+
+[Service]
+Type=simple
+ExecStartPre=+/usr/bin/systemd-tmpfiles --create /usr/lib/tmpfiles.d/custos-ids.conf
+ExecStart=/usr/bin/suricata -c /etc/custos/suricata/custos-suricata.yaml --af-packet
+ExecReload=/bin/kill -USR2 $MAINPID
+Restart=on-failure
+RestartSec=30s
+# Capture only; IDS, never inline.
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW CAP_SYS_NICE CAP_IPC_LOCK
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/data/suricata
+ProtectHome=yes
+PrivateTmp=yes
+# No writable+executable memory: PCRE2 uses its interpreter instead of the
+# JIT (SELinux refuses execmem to this process anyway).
+MemoryDenyWriteExecute=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+MemoryMax=220M
+Nice=5
+
+[Install]
+WantedBy=multi-user.target

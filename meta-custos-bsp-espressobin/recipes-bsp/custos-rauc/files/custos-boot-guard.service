@@ -1,0 +1,13 @@
+[Unit]
+Description=A/B boot counting and fallback (Custos, A13)
+DefaultDependencies=no
+After=local-fs.target
+Before=sysinit.target custos-apply-boot.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/lib/custos/custos-bootchooser boot
+
+[Install]
+WantedBy=sysinit.target

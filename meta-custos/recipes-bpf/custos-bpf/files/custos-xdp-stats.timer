@@ -1,0 +1,11 @@
+[Unit]
+Description=Refresh Custos XDP counters every minute (A12)
+
+[Timer]
+# Calendar based: a monotonic OnUnitActiveSec would stop rearming after a
+# run that was skipped by the service's Condition (filter not attached yet).
+OnCalendar=minutely
+AccuracySec=10s
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,12 @@
+# golang.org/x/crypto v0.41.0
+## explicit; go 1.23.0
+golang.org/x/crypto/argon2
+golang.org/x/crypto/blake2b
+# golang.org/x/sys v0.35.0
+## explicit; go 1.23.0
+golang.org/x/sys/cpu
+# rsc.io/qr v0.2.0
+## explicit
+rsc.io/qr
+rsc.io/qr/coding
+rsc.io/qr/gf256

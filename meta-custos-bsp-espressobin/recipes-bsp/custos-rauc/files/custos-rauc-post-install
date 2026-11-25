@@ -1,0 +1,31 @@
+#!/bin/sh
+# RAUC post-install handler (system.conf [handlers] post-install), A10/A13.
+# Runs after the bundle's images are written, with the bundle still mounted
+# (RAUC_BUNDLE_MOUNT_POINT, signed and verity-protected). The slots are not
+# mounted here: a read-write mount would change the ext4 superblock and so
+# the dm-verity hash of the slot.
+#  - <image>.verity.env from the bundle (custos-bundle.bb) -> CUSTOS_<slot>_VERITY / _DM in
+#    custos-boot.env for every rootfs slot written
+#  - boot.scr from the bundle -> boot partition (boot.scr is shared by both
+#    slots and stays compatible with older images)
+set -eu
+BC=/usr/lib/custos/custos-bootchooser
+M=${RAUC_BUNDLE_MOUNT_POINT:?}
+# custos-bundle.bb ships it under the image name, e.g.
+# custos-image-espressobin.rootfs.verity.env (one rootfs image per bundle).
+V=$(ls "$M"/*.verity.env 2>/dev/null | head -n 1)
+val() { sed -n "s/^$1=//p" "$V"; }
+for i in ${RAUC_TARGET_SLOTS:-}; do
+    eval cls=\${RAUC_SLOT_CLASS_$i:-} bn=\${RAUC_SLOT_BOOTNAME_$i:-} dev=\${RAUC_SLOT_DEVICE_$i:-}
+    [ "$cls" = rootfs ] || continue
+    if [ -n "$V" ] && [ -f "$V" ]; then
+        $BC set-verity "$bn" "$dev" "$(val VERITY_DATA_BLOCKS)" "$(val VERITY_HASH_OFFSET)" \
+            "$(val VERITY_ROOT_HASH)" "$(val VERITY_SALT)"
+        echo "custos-rauc-post-install: slot $bn root hash $(val VERITY_ROOT_HASH)"
+    else
+        $BC clear-verity "$bn"
+        echo "custos-rauc-post-install: bundle has no verity data, slot $bn unchecked"
+    fi
+done
+[ -f "$M/boot.scr" ] && $BC install-boot-script "$M/boot.scr"
+exit 0

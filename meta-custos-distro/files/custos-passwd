@@ -1,0 +1,39 @@
+# Static user IDs of Custos (useradd-staticids, conf/distro/custos.conf).
+#
+# NEVER change or reuse an ID in this file. State on /data survives A/B
+# updates and is owned by number: with dynamic IDs, removing one package
+# (avahi, 2026-11-22) moved custosd and systemd-network, custosd lost its TLS
+# key and the WireGuard key became readable by the custosd group.
+# A new account gets the next free number below the lowest one listed here.
+root:x:0:0:::
+daemon:x:1:1:::
+bin:x:2:2:::
+sys:x:3:3:::
+sync:x:4:65534:::
+games:x:5:60:::
+man:x:6:12:::
+lp:x:7:7:::
+mail:x:8:8:::
+news:x:9:9:::
+uucp:x:10:10:::
+proxy:x:13:13:::
+www-data:x:33:33:::
+backup:x:34:34:::
+list:x:38:38:::
+irc:x:39:39:::
+_apt:x:42:65534:::
+custosd:x:990:986:::
+systemd-network:x:991:987:::
+systemd-timesync:x:992:988:::
+systemd-resolve:x:993:989:::
+avahi:x:994:992:::
+adguardhome:x:995:993:::
+custoswatch:x:996:994:::
+rpc:x:997:997:::
+messagebus:x:998:998:::
+arpwatch:x:999:999:::
+nobody:x:65534:65534:::
+# Built as dependencies, not in the image: reserved.
+sshd:x:985:985:::
+avahi-autoipd:x:984:984:::
+ptest:x:983:983:::

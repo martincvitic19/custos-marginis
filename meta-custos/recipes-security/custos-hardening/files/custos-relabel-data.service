@@ -1,0 +1,17 @@
+[Unit]
+Description=SELinux labels on /data (Custos, A11)
+# /data is formatted empty when the image is written: label it before
+# tmpfiles and the services create their directories there.
+DefaultDependencies=no
+ConditionSecurity=selinux
+RequiresMountsFor=/data
+After=local-fs.target
+Before=systemd-tmpfiles-setup.service custos-apply-boot.service sysinit.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/restorecon -RF /data
+
+[Install]
+WantedBy=sysinit.target

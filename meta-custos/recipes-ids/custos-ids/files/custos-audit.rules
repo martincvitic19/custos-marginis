@@ -1,0 +1,6 @@
+# Custos audit rules (A12): who touches the keys and the policy.
+-w /data/custos/wg/ -p rwa -k custos_wg_keys
+-w /data/custos/custos.json -p wa -k custos_config
+-w /etc/custos/ -p wa -k custos_firewall
+-w /data/custosd/auth.json -p wa -k custos_auth
+-a always,exit -F arch=b64 -S init_module,finit_module,delete_module -k kernel_modules

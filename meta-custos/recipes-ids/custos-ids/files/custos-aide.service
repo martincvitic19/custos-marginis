@@ -1,0 +1,11 @@
+[Unit]
+Description=AIDE integrity check (Custos)
+RequiresMountsFor=/data/aide /data/custos
+After=custos-apply.service
+
+[Service]
+Type=oneshot
+ExecStartPre=+/usr/bin/systemd-tmpfiles --create /usr/lib/tmpfiles.d/custos-ids.conf
+ExecStart=/usr/sbin/custos-aide-check
+Nice=10
+IOSchedulingClass=idle

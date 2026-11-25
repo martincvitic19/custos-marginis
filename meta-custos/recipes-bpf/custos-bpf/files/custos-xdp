@@ -1,0 +1,127 @@
+#!/bin/sh
+# Load the Custos XDP edge filter (A12) and fill its maps.
+#   custos-xdp start   native on eth0 (DSA conduit); falls back to generic
+#                      on the wan port if native XDP is refused
+#   custos-xdp stop    detach
+#   custos-xdp stats   counters (pass, from wan, bogon, TIF, SYN drops)
+#   custos-xdp stats-json  write the counters of the active filter to
+#                      /run/custos/xdp-stats.json for custosd (timer)
+#   custos-xdp generic same filter in generic mode on "wan" (comparison)
+set -u
+LIB=/usr/lib/custos/bpf
+PIN=/sys/fs/bpf/custos
+EVENTS=/data/custos/events.jsonl
+RUN=/run/custos
+
+load() { # load <object> <pin name>
+    mkdir -p $PIN
+    rm -rf "$PIN/$2" "$PIN/maps-$2"
+    bpftool prog loadall "$LIB/$1" "$PIN/$2" type xdp pinmaps "$PIN/maps-$2"
+}
+
+fill() { # fill <maps dir>
+    m=$1
+    # Sources that can never be genuine on the internet side. The ISP
+    # router's LAN (192.168.0.0/24) is private but legitimate: not listed.
+    for p in 0.0.0.0/8 127.0.0.0/8 169.254.0.0/16 224.0.0.0/4 240.0.0.0/4 \
+             192.0.2.0/24 198.51.100.0/24 203.0.113.0/24; do
+        printf 'map update pinned %s/bogon_v4 key hex %s value hex 01\n' "$m" "$(lpm_hex $p)"
+    done > /run/custos/xdp-bogon.batch
+    batch /run/custos/xdp-bogon.batch || return 1
+    if [ -s $LIB/tif-v4.batch ]; then
+        sed "s|@MAP@|$m/tif_v4|" $LIB/tif-v4.batch > /run/custos/xdp-tif.batch
+        batch /run/custos/xdp-tif.batch || return 1
+        rm -f /run/custos/xdp-tif.batch     # 2.4 MB in tmpfs
+    fi
+}
+
+# batch <file>: a filter with empty lists looks healthy, so failing to fill
+# a map must fail the service.
+batch() {
+    out=$(bpftool batch file "$1" 2>&1) && return 0
+    echo "custos-xdp: cannot fill maps from $1: $(echo "$out" | head -n 3)" >&2
+    return 1
+}
+
+# LPM key: prefixlen (u32, little endian on arm64) + address (network order)
+lpm_hex() {
+    ip=${1%/*}; len=${1#*/}
+    printf '%02x %02x %02x %02x ' $((len & 255)) $((len >> 8 & 255)) 0 0
+    echo "$ip" | awk -F. '{ printf "%02x %02x %02x %02x", $1, $2, $3, $4 }'
+}
+
+# counters <maps dir>: "<name> <sum over CPUs>" per line. Uses the BTF
+# "formatted" part of the JSON dump (the raw part holds hex byte arrays).
+counters() {
+    bpftool -j map dump pinned "$1/xdp_stats" | awk '
+        BEGIN { split("pass wan bogon tif syn", name, " ") }
+        {
+            n = split($0, part, "\"formatted\":")
+            for (i = 2; i <= n; i++) {
+                p = part[i]
+                if (!match(p, /"key": *[0-9]+/)) continue
+                k = substr(p, RSTART, RLENGTH); sub(/.*: */, "", k)
+                p = substr(p, RSTART + RLENGTH)
+                while (match(p, /"value": *[0-9]+/)) {
+                    v = substr(p, RSTART, RLENGTH); sub(/.*: */, "", v)
+                    sum[k + 0] += v; seen = 1
+                    p = substr(p, RSTART + RLENGTH)
+                }
+            }
+        }
+        END {
+            if (!seen) exit 1
+            for (i = 0; i < 5; i++) printf "%s %.0f\n", name[i + 1], sum[i]
+        }'
+}
+
+case "${1:-start}" in
+start)
+    mkdir -p /run/custos
+    load xdp_edge_dsa.o dsa || exit 1
+    if bpftool net attach xdpdrv pinned $PIN/dsa/xdp_edge dev eth0 overwrite 2>/run/custos/xdp.err; then
+        mode="native eth0"
+    else
+        echo "native XDP on eth0 refused: $(cat /run/custos/xdp.err); using generic on wan" >&2
+        load xdp_edge_plain.o plain || exit 1
+        bpftool net attach xdpgeneric pinned $PIN/plain/xdp_edge dev wan overwrite || exit 1
+        mode="generic wan"
+        fill $PIN/maps-plain || exit 1
+        echo "$mode" > $RUN/xdp-mode
+        echo "custos-xdp: attached ($mode)"
+        exit 0
+    fi
+    fill $PIN/maps-dsa || exit 1
+    echo "$mode" > $RUN/xdp-mode
+    echo "custos-xdp: attached ($mode), $(grep -c update $LIB/tif-v4.batch 2>/dev/null || echo 0) TIF entries"
+    ;;
+generic)
+    load xdp_edge_plain.o plain || exit 1
+    bpftool net attach xdpgeneric pinned $PIN/plain/xdp_edge dev wan overwrite || exit 1
+    fill $PIN/maps-plain || exit 1
+    ;;
+stop)
+    bpftool net detach xdpdrv dev eth0 2>/dev/null
+    bpftool net detach xdpgeneric dev wan 2>/dev/null
+    rm -rf $PIN
+    rm -f $RUN/xdp-mode $RUN/xdp-stats.json
+    ;;
+stats-json)
+    mode=$(cat $RUN/xdp-mode 2>/dev/null) || exit 0
+    case "$mode" in native*) maps=$PIN/maps-dsa ;; *) maps=$PIN/maps-plain ;; esac
+    c=$(counters "$maps") || { rm -f $RUN/xdp-stats.json; exit 1; }
+    {
+        printf '{"mode":"%s","time":"%s"' "$mode" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        echo "$c" | while read -r k v; do printf ',"%s":%s' "$k" "$v"; done
+        echo '}'
+    } > $RUN/xdp-stats.json.tmp && mv $RUN/xdp-stats.json.tmp $RUN/xdp-stats.json
+    ;;
+stats)
+    for d in $PIN/maps-*; do
+        [ -e "$d/xdp_stats" ] || continue
+        echo "$d:"
+        counters "$d" | while read -r k v; do printf '  %-6s %s\n' "$k" "$v"; done
+    done
+    ;;
+*) echo "usage: $0 start|stop|stats|stats-json|generic" >&2; exit 64 ;;
+esac

@@ -1,5 +1,5 @@
 {
-    "description": "Globalscale ESPRESSObin on Yocto Project 6.0 LTS 'wrynose' (Poky reference distro, systemd)",
+    "description": "Globalscale ESPRESSObin on Yocto Project 6.0 LTS 'wrynose' (Custos distro, systemd)",
     "expires": "2030-04-30",
     "sources": {
         "bitbake": {
@@ -29,27 +29,62 @@
                 "branch": "wrynose",
                 "rev": "c0fcd7cca3760ef24e087ac4a31b8f357cb204da"
             }
+        },
+        "meta-security": {
+            "git-remote": {
+                "uri": "https://git.yoctoproject.org/meta-security",
+                "branch": "wrynose",
+                "rev": "2703974d5e2d61b221dffa302c2e059a522adbf3"
+            }
+        },
+        "meta-clang": {
+            "git-remote": {
+                "uri": "https://github.com/kraj/meta-clang",
+                "branch": "wrynose",
+                "rev": "ef0d22f21910a0c30c967eeb17d8f209806e2d81"
+            }
+        },
+        "meta-selinux": {
+            "git-remote": {
+                "uri": "https://git.yoctoproject.org/meta-selinux",
+                "branch": "wrynose",
+                "rev": "83b742346d5aac41ad9a7a5cb07c3a698e89eb11"
+            }
+        },
+        "meta-rauc": {
+            "git-remote": {
+                "uri": "https://github.com/rauc/meta-rauc",
+                "branch": "wrynose",
+                "rev": "38da0e5866a953e664001ba90b5edad68d68cd5d"
+            }
         }
     },
     "bitbake-setup": {
         "configurations": [
             {
                 "name": "espressobin",
-                "description": "ESPRESSObin core-image-minimal (yocto-6.0.4)",
+                "description": "ESPRESSObin custos-image (yocto-6.0.4)",
                 "bb-layers": [
                     "openembedded-core/meta",
                     "meta-yocto/meta-poky",
                     "meta-openembedded/meta-oe",
                     "meta-openembedded/meta-python",
-                    "meta-openembedded/meta-networking"
+                    "meta-openembedded/meta-networking",
+                    "meta-security",
+                    "meta-selinux",
+                    "meta-clang",
+                    "meta-rauc"
                 ],
                 "bb-layers-file-relative": [
                     "meta-espressobin",
-                    "meta-espressobin-image"
+                    "meta-espressobin-image",
+                    "meta-custos-distro",
+                    "meta-custos",
+                    "meta-custos-bsp-espressobin"
                 ],
                 "oe-fragments": [
                     "machine/espressobin",
-                    "distro/poky"
+                    "distro/custos"
                 ],
                 "setup-dir-name": "espressobin-wrynose"
             }

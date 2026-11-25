@@ -1,0 +1,173 @@
+{
+  "version": 1,
+  "main": {
+    "name": "Custos",
+    "timezone": "Europe/Zagreb"
+  },
+  "network": {
+    "bridge": "br-lan",
+    "wan": "wan",
+    "admin_vlan": 20,
+    "vlans": [
+      {
+        "id": 10,
+        "name": "djeca"
+      },
+      {
+        "id": 20,
+        "name": "odrasli"
+      },
+      {
+        "id": 30,
+        "name": "gosti"
+      }
+    ]
+  },
+  "filtering": {
+    "safesearch": true,
+    "update_interval_hours": 24,
+    "lists": [
+      {
+        "name": "HaGeZi Multi PRO",
+        "url": "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/pro.txt",
+        "enabled": true
+      },
+      {
+        "name": "HaGeZi Threat Intelligence Feeds (medium)",
+        "url": "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/tif.medium.txt",
+        "enabled": true
+      },
+      {
+        "name": "HaGeZi NSFW",
+        "url": "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/nsfw.txt",
+        "enabled": true
+      },
+      {
+        "name": "HaGeZi DoH/VPN/TOR/Proxy Bypass",
+        "url": "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/doh-vpn-proxy-bypass.txt",
+        "enabled": true
+      },
+      {
+        "name": "HaGeZi Gambling",
+        "url": "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/gambling.txt",
+        "enabled": true
+      },
+      {
+        "name": "HaGeZi Search engines without SafeSearch",
+        "url": "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/nosafesearch.txt",
+        "enabled": true
+      },
+      {
+        "name": "HaGeZi Social Networks",
+        "url": "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/social.txt",
+        "enabled": false
+      }
+    ],
+    "rules": []
+  },
+  "roles": {
+    "child": {
+      "filtering": true,
+      "safesearch": true,
+      "blocked_services": [],
+      "strict_egress": true,
+      "schedules": [
+        {
+          "days": [
+            "sun",
+            "mon",
+            "tue",
+            "wed",
+            "thu"
+          ],
+          "from": "21:00",
+          "to": "07:00"
+        },
+        {
+          "days": [
+            "fri",
+            "sat"
+          ],
+          "from": "22:30",
+          "to": "08:00"
+        }
+      ]
+    },
+    "guest": {
+      "filtering": true,
+      "safesearch": true,
+      "blocked_services": [],
+      "strict_egress": false,
+      "schedules": []
+    },
+    "trusted": {
+      "filtering": true,
+      "safesearch": false,
+      "blocked_services": [],
+      "strict_egress": false,
+      "schedules": []
+    },
+    "unfiltered": {
+      "filtering": false,
+      "safesearch": false,
+      "blocked_services": [],
+      "strict_egress": false,
+      "schedules": []
+    }
+  },
+  "devices": [
+    {
+      "name": "laptop",
+      "mac": "02:00:5e:00:53:01",
+      "vlan": 20,
+      "role": "trusted"
+    },
+    {
+      "name": "Ivin tablet",
+      "mac": "02:11:22:33:44:55",
+      "vlan": 10,
+      "role": "child"
+    }
+  ],
+  "vpn": {
+    "enabled": true,
+    "port": 51820,
+    "subnet": "192.168.40.0/24",
+    "endpoint": "203.0.113.10",
+    "exit": "mullvad",
+    "peers": []
+  },
+  "wifi": {
+    "enabled": true,
+    "country": "HR",
+    "band": "a",
+    "channel": 36,
+    "ssids": [
+      {
+        "name": "Custos-Djeca",
+        "vlan": 10
+      },
+      {
+        "name": "Custos-Doma",
+        "vlan": 20
+      }
+    ],
+    "isp_ssids": []
+  },
+  "alerts": {
+    "bypass": {
+      "window_minutes": 10,
+      "min_bytes": 5242880,
+      "max_dns": 2
+    },
+    "upload": {
+      "window_minutes": 10,
+      "max_bytes": 209715200
+    },
+    "isp_watch": {
+      "enabled": true,
+      "interval_minutes": 5,
+      "ignore_macs": []
+    }
+  }
+}

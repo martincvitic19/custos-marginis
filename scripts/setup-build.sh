@@ -49,4 +49,4 @@ fi
 echo
 echo "Build directory ready. Next:"
 echo "  source $SETUP/build/init-build-env"
-echo "  bitbake core-image-minimal"
+echo "  bitbake custos-image"

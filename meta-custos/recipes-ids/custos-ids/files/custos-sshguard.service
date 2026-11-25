@@ -1,0 +1,11 @@
+[Unit]
+Description=sshguard: block SSH brute force (Custos, A12)
+After=network.target custos-firewall.service
+
+[Service]
+# Configuration: /etc/sshguard.conf (fixed path in the sshguard wrapper).
+ExecStart=/usr/sbin/sshguard
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

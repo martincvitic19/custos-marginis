@@ -1,0 +1,15 @@
+[Unit]
+Description=Custos apply requests from custosd
+
+[Socket]
+# Only custosd may connect (group custosd). It sends {"action":"apply"};
+# custos-apply re-reads and validates custos.json itself.
+ListenStream=/run/custos/apply.sock
+SocketUser=root
+SocketGroup=custosd
+SocketMode=0660
+Accept=yes
+MaxConnections=4
+
+[Install]
+WantedBy=sockets.target

@@ -1,0 +1,21 @@
+[Unit]
+# Instance = VLAN number (custos-arpwatch@10 watches br-lan.10). Not the
+# interface name: in a unit instance "-" is the escape for "/", so %I of
+# "br-lan.10" is "br/lan.10" and arpwatch got a non-existent interface.
+Description=arpwatch on br-lan.%i (Custos, A12: ARP changes / spoofing)
+After=network.target systemd-networkd.service
+BindsTo=sys-subsystem-net-devices-br\x2dlan.%i.device
+After=sys-subsystem-net-devices-br\x2dlan.%i.device
+RequiresMountsFor=/data/arpwatch
+
+[Service]
+ExecStartPre=+/usr/bin/systemd-tmpfiles --create /usr/lib/tmpfiles.d/custos-ids.conf
+ExecStartPre=/bin/sh -c 'test -e /data/arpwatch/br-lan.%i.dat || touch /data/arpwatch/br-lan.%i.dat'
+# -N: ignore bogons; -d: no mail (there is none on the router), stay in
+# the foreground and report to stderr (journal).
+ExecStart=/usr/sbin/arpwatch -d -N -i br-lan.%i -f /data/arpwatch/br-lan.%i.dat
+Restart=on-failure
+RestartSec=30s
+
+[Install]
+WantedBy=multi-user.target

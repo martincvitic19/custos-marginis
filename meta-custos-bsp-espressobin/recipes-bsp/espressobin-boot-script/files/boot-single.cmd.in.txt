@@ -1,0 +1,14 @@
+# Boot script for the Globalscale ESPRESSObin, sourced by the factory
+# U-Boot 2017.03 bootcmd:  ext4load mmc 0:1 0x6d00000 boot.scr; source 0x6d00000
+# Load addresses sit above the script itself (0x6d00000).
+setenv kernel_addr_r 0x7000000
+setenv fdt_addr_r 0x6f00000
+
+mmc dev 0
+part uuid mmc 0:2 rootuuid
+setenv bootargs "console=ttyMV0,115200 earlycon=ar3700_uart,0xd0012000 root=PARTUUID=${rootuuid} rootfstype=ext4 rootwait rw pcie_aspm=off lockdown=integrity"
+
+echo "Booting @KERNEL_IMAGETYPE@ + @DTB@ from mmc 0:1, root=PARTUUID=${rootuuid}"
+ext4load mmc 0:1 ${kernel_addr_r} @KERNEL_IMAGETYPE@
+ext4load mmc 0:1 ${fdt_addr_r} @DTB@
+booti ${kernel_addr_r} - ${fdt_addr_r}

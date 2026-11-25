@@ -5,9 +5,20 @@
 # Partition 3 holds the state that must survive a root file system update
 # (AdGuard Home configuration, query log, statistics); wic adds it to
 # /etc/fstab. It is created empty and formatted on every new image write.
+#
+# --ondisk is only a name here: at run time the microSD is mmcblk1 (the
+# eMMC is mmcblk0). The fstab entry must therefore use PARTUUID
+# (--use-uuid), not /dev/mmcblk0p3. nofail: a missing /data must not drop
+# the boot into emergency mode (no SSH); the services that need it have
+# RequiresMountsFor= and stay down instead (DNS fails closed).
+# x-systemd.before=local-fs.target: nofail alone drops that ordering, and
+# then systemd-tmpfiles creates /data/* on the root file system before the
+# mount hides it (seen on the first boot, 2026-11-20).
 
 part --source bootimg_partition --ondisk mmcblk0 --fstype=ext4 --label boot --active --align 4096 --size 64
-part / --source rootfs --ondisk mmcblk0 --fstype=ext4 --label root --align 4096
-part /data --ondisk mmcblk0 --fstype=ext4 --label data --align 4096 --size 512
+part / --source rootfs --ondisk mmcblk0 --fstype=ext4 --label root --align 4096 --no-fstab-update
+# /data is mounted by LABEL=data from the fstab in base-files
+# (base-files_%.bbappend); wic must not rewrite fstab (drops SELinux labels).
+part --ondisk mmcblk0 --fstype=ext4 --label data --align 4096 --size 512
 
 bootloader --ptable msdos

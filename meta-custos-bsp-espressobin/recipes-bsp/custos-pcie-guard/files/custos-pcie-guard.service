@@ -1,0 +1,15 @@
+[Unit]
+Description=Load the Wi-Fi driver only if the card answers on PCIe
+# Before custos-apply so it sees the radio and starts the access point.
+After=systemd-udevd.service systemd-modules-load.service local-fs.target
+Before=custos-apply.service custos-hostapd.service
+ConditionPathExists=/sys/bus/pci/devices
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/custos-pcie-guard
+TimeoutStartSec=60
+
+[Install]
+WantedBy=multi-user.target

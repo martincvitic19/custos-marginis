@@ -20,6 +20,21 @@ PARALLEL_MAKE ?= "-j 4"
 # The target gcc build (gimple-match-*.o) needs >1 GB per compiler process.
 PARALLEL_MAKE:pn-gcc = "-j 2"
 
+# LLVM, clang and Rust (Suricata, XDP) run out of memory on an 8 GB host.
+PARALLEL_MAKE:pn-llvm-tblgen-native = "-j 1"
+PARALLEL_MAKE:pn-llvm-native = "-j 2"
+PARALLEL_MAKE:pn-clang-native = "-j 2"
+PARALLEL_MAKE:pn-clang = "-j 2"
+PARALLEL_MAKE:pn-llvm = "-j 2"
+PARALLEL_MAKE:pn-rust-native = "-j 1"
+PARALLEL_MAKE:pn-rust-llvm-native = "-j 1"
+PARALLEL_MAKE:pn-suricata = "-j 2"
+LLVM_TARGETS_TO_BUILD = "AArch64;BPF;X86"
+EXTRA_OECMAKE:append:pn-llvm-native = " -DLLVM_PARALLEL_LINK_JOBS=1"
+EXTRA_OECMAKE:append:pn-llvm = " -DLLVM_PARALLEL_LINK_JOBS=1"
+EXTRA_OECMAKE:append:pn-clang-native = " -DLLVM_PARALLEL_LINK_JOBS=1"
+EXTRA_OECMAKE:append:pn-clang = " -DLLVM_PARALLEL_LINK_JOBS=1"
+
 PACKAGE_CLASSES ?= "package_ipk"
 
 #

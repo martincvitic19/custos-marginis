@@ -1,0 +1,8 @@
+[Unit]
+Description=Write Custos XDP counters for custosd (A12)
+After=custos-xdp.service
+ConditionPathExists=/run/custos/xdp-mode
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/custos-xdp stats-json

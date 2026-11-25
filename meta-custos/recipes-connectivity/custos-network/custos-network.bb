@@ -25,7 +25,7 @@ INHIBIT_DEFAULT_DEPS = "1"
 do_install[vardeps] += " \
     CUSTOS_CONDUIT_IF CUSTOS_WAN_IF CUSTOS_WAN_ADDRESS CUSTOS_WAN_GATEWAY \
     CUSTOS_WAN_DNS CUSTOS_WAN_CAKE_BANDWIDTH CUSTOS_BRIDGE CUSTOS_VLANS \
-    CUSTOS_LAN_DNS CUSTOS_LAN_PORTS \
+    CUSTOS_LAN_DNS CUSTOS_LAN_PORTS CUSTOS_ADMIN_VLAN \
 "
 
 # Units go to the vendor directory; /etc/systemd/network stays free for
@@ -90,6 +90,10 @@ do_install() {
             -e "s,@ADDRESS@,192.168.$id.1/24,g" \
             -e "s,@DNS@,$dns,g" \
             ${UNPACKDIR}/05-custos-vlan.network.in > $netdir/05-custos-$name.network
+        # custos.local (resolved mDNS responder) only on the admin VLAN.
+        if [ "$id" = "${CUSTOS_ADMIN_VLAN}" ]; then
+            sed -i '/^DHCPServer=yes$/a MulticastDNS=yes' $netdir/05-custos-$name.network
+        fi
     done
 }
 

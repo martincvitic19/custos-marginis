@@ -1,0 +1,90 @@
+#!/bin/sh
+# RAUC custom bootloader backend (A13) for the factory U-Boot.
+# State file custos-boot.env on the boot partition (mmcblk1p1):
+#   CUSTOS_SLOT=A|B            slot boot.scr loads
+#   CUSTOS_A_STATE / _B_STATE  good | bad | trying
+#   CUSTOS_TRIES=<n>           boots left for a slot in "trying"
+# RAUC calls: get-primary | set-primary <slot> | get-state <slot> |
+#             set-state <slot> good|bad | get-current
+#   CUSTOS_A_VERITY / _B_VERITY  "<data blocks> <hash offset> <root hash> <salt>"
+#   CUSTOS_A_DM / _B_DM    dm-mod.create table for that slot (A10, for the
+#                          step that boots from the verity device)
+# custos-health-check calls: get-raw-state <slot> (good|bad|trying)
+# custos-boot-guard calls: boot (count down / fall back at early boot)
+# custos-rauc-post-install calls: set-verity <slot> <device> <blocks>
+#   <offset> <hash> <salt> | clear-verity <slot> | install-boot-script <file>
+# custos-verity-check calls: get-verity <slot>
+set -eu
+PART=/dev/mmcblk1p1
+MNT=/run/custos/bootpart
+ENV=$MNT/custos-boot.env
+TRIES=3
+
+mnt() { mkdir -p $MNT; grep -q " $MNT " /proc/mounts || mount -t ext4 $PART $MNT; }
+umnt() { sync; umount $MNT 2>/dev/null || true; }
+trap umnt EXIT
+get() { grep "^$1=" $ENV 2>/dev/null | cut -d= -f2-; }
+put() { # put KEY VALUE (atomic: tmp + rename on the same file system)
+    t=$ENV.tmp
+    { grep -v "^$1=" $ENV 2>/dev/null || true; echo "$1=$2"; } > $t
+    sync; mv $t $ENV; sync
+}
+other() { [ "$1" = A ] && echo B || echo A; }
+current() { # slot we booted: from the root partition number on the cmdline
+    p=$(sed -n 's/.*root=PARTUUID=[0-9a-f]*-0\([0-9]\).*/\1/p' /proc/cmdline)
+    [ "$p" = 3 ] && echo B || echo A
+}
+
+mnt
+[ -f $ENV ] || { printf 'CUSTOS_SLOT=A\nCUSTOS_A_STATE=good\nCUSTOS_B_STATE=bad\nCUSTOS_TRIES=0\n' > $ENV; sync; }
+case "${1:-}" in
+get-primary) get CUSTOS_SLOT ;;
+set-primary) put CUSTOS_SLOT "$2"; put CUSTOS_${2}_STATE trying; put CUSTOS_TRIES $TRIES ;;
+get-state)   s=$(get CUSTOS_${2}_STATE); [ "$s" = bad ] && echo bad || echo good ;;
+set-state)   put CUSTOS_${2}_STATE "$3"; [ "$3" = good ] && put CUSTOS_TRIES 0 || true ;;
+get-current) current ;;
+get-raw-state) get CUSTOS_${2}_STATE ;;
+get-verity)  get CUSTOS_${2}_VERITY ;;
+set-verity)  # <slot> <device> <data blocks> <hash offset bytes> <root hash> <salt>
+    s=$2 dev=$3 n=$4 off=$5 h=$6 salt=$7
+    case "$s" in A|B) ;; *) echo "bad slot '$s'" >&2; exit 64 ;; esac
+    echo "$n $off" | grep -qxE '[0-9]+ [0-9]+' || { echo "bad block count/offset" >&2; exit 64; }
+    echo "$h $salt" | grep -qxE '[0-9a-f]{64} [0-9a-f]{64}' || { echo "bad root hash/salt" >&2; exit 64; }
+    case "$dev" in /dev/mmcblk[0-9]p[0-9]) ;; *) echo "bad device '$dev'" >&2; exit 64 ;; esac
+    [ $((off % 4096)) -eq 0 ] || { echo "hash offset not 4096-aligned" >&2; exit 64; }
+    # dm-verity table: 4096-byte blocks, hash tree starts one block after
+    # the verity superblock at the hash offset.
+    put CUSTOS_${s}_VERITY "$n $off $h $salt"
+    put CUSTOS_${s}_DM "vroot,,,ro,0 $((n * 8)) verity 1 $dev $dev 4096 4096 $n $((off / 4096 + 1)) sha256 $h $salt"
+    ;;
+clear-verity)
+    case "$2" in A|B) ;; *) exit 64 ;; esac
+    t=$ENV.tmp; grep -vE "^CUSTOS_${2}_(VERITY|DM)=" $ENV > $t || true; sync; mv $t $ENV; sync
+    ;;
+install-boot-script) # <file>: replace boot.scr on the boot partition atomically
+    f=$2
+    [ -s "$f" ] || { echo "no boot script '$f'" >&2; exit 64; }
+    # U-Boot legacy image header magic 0x27051956.
+    [ "$(dd if="$f" bs=4 count=1 2>/dev/null | od -tx1 | awk 'NR==1{print $2$3$4$5}')" = 27051956 ] || { echo "'$f' is not a U-Boot script image" >&2; exit 65; }
+    cmp -s "$f" $MNT/boot.scr && exit 0
+    cp "$f" $MNT/boot.scr.tmp; sync; mv $MNT/boot.scr.tmp $MNT/boot.scr; sync
+    echo "custos-bootchooser: boot.scr updated"
+    ;;
+boot)
+    cur=$(current); st=$(get CUSTOS_${cur}_STATE); n=$(get CUSTOS_TRIES)
+    if [ "$st" = trying ]; then
+        if [ "${n:-0}" -le 0 ]; then
+            # Out of tries: back to the other slot.
+            o=$(other $cur)
+            put CUSTOS_${cur}_STATE bad; put CUSTOS_SLOT $o; put CUSTOS_TRIES 0
+            echo "custos-bootchooser: slot $cur failed $TRIES boots, falling back to $o"
+            printf '{"time":"%s","kind":"update","severity":"alert","message":"Ažuriranje (slot %s) nije uspjelo 3 puta: vraćeno na slot %s"}\n' \
+                "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$cur" "$o" >> /data/custos/events.jsonl 2>/dev/null || true
+            umnt; systemctl reboot --force; exit 0
+        fi
+        put CUSTOS_TRIES $((n - 1))
+        echo "custos-bootchooser: slot $cur trying, $((n - 1)) boots left"
+    fi
+    ;;
+*) echo "usage: $0 get-primary|set-primary S|get-state S|set-state S good|bad|get-current|boot|get-verity S|set-verity S DEV N OFF HASH SALT|clear-verity S|install-boot-script FILE" >&2; exit 64 ;;
+esac

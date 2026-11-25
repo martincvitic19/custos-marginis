@@ -1,0 +1,11 @@
+[Unit]
+Description=Custos apply every minute (curfew start/end, retries)
+
+[Timer]
+# Curfew windows are minutes; a run that changes nothing costs a few reads.
+OnCalendar=*-*-* *:*:00
+AccuracySec=1s
+Unit=custos-apply-retry.service
+
+[Install]
+WantedBy=timers.target

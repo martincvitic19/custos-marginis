@@ -1,0 +1,40 @@
+#!/bin/sh
+# Load ath10k_pci only if the Wi-Fi card answers on PCIe (see
+# /usr/lib/modprobe.d/custos-ath10k.conf). Exit 0 in every case: no Wi-Fi
+# must never stop the router.
+EVENTS=/data/custos/events.jsonl
+
+event() { # event <severity> <message>
+    printf '{"time":"%s","kind":"wifi","severity":"%s","message":"%s"}\n' \
+        "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1" "$2" >> $EVENTS 2>/dev/null
+    echo "custos-pcie-guard: $2"
+}
+
+dev=""
+for d in /sys/bus/pci/devices/*; do
+    [ "$(cat $d/vendor 2>/dev/null)" = 0x168c ] && dev=$d && break
+done
+if [ -z "$dev" ]; then
+    echo "custos-pcie-guard: no Qualcomm Atheros card on PCIe"
+    exit 0
+fi
+
+# A dead link reads as all ones. Read twice, a second apart, so a link that
+# is still training gets a chance.
+ok=0
+for i in 1 2 3; do
+    # busybox od: no -A/-N, so cut the first 8 bytes with dd.
+    id=$(dd if="$dev/config" bs=8 count=1 2>/dev/null | od -x | awk 'NR==1 {print $2 $3}')
+    pm=$(dd if="$dev/config" bs=8 count=1 2>/dev/null | od -x | awk 'NR==1 {print $4 $5}')
+    if [ -n "$id" ] && [ "$id" != ffffffff ]; then ok=1; break; fi
+    sleep 1
+done
+if [ $ok -ne 1 ]; then
+    event alert "Wi-Fi kartica $(basename $dev) ne odgovara na PCIe (config $id): ath10k_pci nije učitan, ruter radi bez Wi-Fija"
+    exit 0
+fi
+echo "custos-pcie-guard: $(basename $dev) answers (id $id, command/status $pm), loading ath10k_pci"
+if ! modprobe ath10k_pci; then
+    event alert "ath10k_pci se nije učitao (vidi dmesg)"
+fi
+exit 0

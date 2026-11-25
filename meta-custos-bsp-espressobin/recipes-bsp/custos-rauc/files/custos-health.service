@@ -1,0 +1,9 @@
+[Unit]
+Description=A/B health check, marks the slot good (Custos, A13)
+After=multi-user.target custos-apply.service adguardhome.service
+OnFailure=reboot.target
+
+[Service]
+Type=oneshot
+ExecStartPre=/bin/sleep 180
+ExecStart=/usr/lib/custos/custos-health-check

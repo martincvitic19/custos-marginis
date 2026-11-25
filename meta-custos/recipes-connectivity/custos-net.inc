@@ -13,7 +13,10 @@ CUSTOS_CONDUIT_IF ?= "eth0"
 CUSTOS_WAN_IF ?= "wan"
 CUSTOS_WAN_ADDRESS ?= "192.168.0.15/24"
 CUSTOS_WAN_GATEWAY ?= "192.168.0.1"
-CUSTOS_WAN_DNS ?= "192.168.0.1"
+# DNS for the router's own lookups (NTP, block list downloads, ...); clients
+# always use AdGuard Home. Quad9: the ISP router's DNS proxy is not reliable
+# (it does not answer at all on the development line, 2026-11-19).
+CUSTOS_WAN_DNS ?= "9.9.9.9 149.112.112.112"
 # CAKE shaper rate for wan egress, e.g. "95M" (about 90-95 % of the real
 # uplink). Empty: CAKE runs unshaped (flow fairness only).
 CUSTOS_WAN_CAKE_BANDWIDTH ?= ""

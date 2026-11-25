@@ -1,0 +1,35 @@
+#!/bin/sh
+# A10: compare the booted root slot with the dm-verity hash tree written at
+# build time (root hash recorded by the RAUC post-install handler). The root
+# file system is mounted read-only, so any difference is a change outside
+# the update path (raw writes to the partition, a bad card). Result to the
+# event log; exit 1 on a mismatch (custos-health-check uses this for a slot
+# that is still "trying").
+BC=/usr/lib/custos/custos-bootchooser
+EVENTS=/data/custos/events.jsonl
+slot=$($BC get-current)
+# At boot (custos-verity-check.service) a slot still on trial is left to
+# custos-health-check, which runs the same check before marking it good.
+if [ "${1:-}" = boot ] && [ "$($BC get-raw-state "$slot")" = trying ]; then
+    echo "slot $slot is trying: checked by custos-health-check"; exit 0
+fi
+[ "$slot" = B ] && dev=/dev/mmcblk1p3 || dev=/dev/mmcblk1p2
+v=$($BC get-verity "$slot")
+if [ -z "$v" ]; then
+    echo "slot $slot: no root hash recorded (flashed with wic, or installed by an older RAUC handler)"
+    exit 0
+fi
+set -- $v
+# libcryptsetup will not open the partition while it is mounted (the booted
+# root: "Device ... does not exist or access denied"); a read-only loop
+# device over it can be opened.
+loop=$(losetup -f) && losetup -r "$loop" "$dev" || { echo "slot $slot: no loop device for $dev"; exit 0; }
+trap 'losetup -d "$loop" 2>/dev/null' EXIT
+if out=$(veritysetup verify "$loop" "$loop" "$3" --hash-offset="$2" 2>&1); then
+    echo "slot $slot ($dev): matches root hash $3"
+    exit 0
+fi
+echo "slot $slot ($dev): DOES NOT match root hash $3: $out"
+printf '{"time":"%s","kind":"integrity","severity":"alert","message":"Root slot %s ne odgovara potpisanom imageu (dm-verity provjera)"}\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$slot" >> $EVENTS 2>/dev/null
+exit 1

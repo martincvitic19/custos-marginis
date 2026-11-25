@@ -1,0 +1,14 @@
+[Unit]
+Description=Compare the root slot with its dm-verity hash (Custos, A10)
+After=multi-user.target
+RequiresMountsFor=/data
+
+[Service]
+Type=oneshot
+# Reads the whole root file system once: lowest CPU and I/O priority.
+Nice=19
+IOSchedulingClass=idle
+ExecStart=/usr/lib/custos/custos-verity-check boot
+
+[Install]
+WantedBy=multi-user.target

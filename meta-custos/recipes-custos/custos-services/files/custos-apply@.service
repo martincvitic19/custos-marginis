@@ -1,0 +1,11 @@
+[Unit]
+Description=Custos apply request from custosd
+RequiresMountsFor=/data/custos
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/custos-apply --mode=socket
+StandardInput=socket
+StandardOutput=socket
+StandardError=journal
+TimeoutStartSec=150

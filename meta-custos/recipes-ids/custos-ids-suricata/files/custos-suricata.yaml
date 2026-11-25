@@ -1,0 +1,110 @@
+%YAML 1.1
+---
+# Custos Marginis Suricata configuration (A12): IDS only (no IPS), sized
+# for 1 GB RAM next to AdGuard Home. Only alerts and anomalies are logged
+# (no DNS/HTTP/TLS/flow records): no browsing history of children on disk.
+vars:
+  address-groups:
+    HOME_NET: "[192.168.10.0/24,192.168.20.0/24,192.168.30.0/24,192.168.40.0/24]"
+    EXTERNAL_NET: "!$HOME_NET"
+    CHILD_NET: "192.168.10.0/24"
+    ADULT_NET: "192.168.20.0/24"
+    GUEST_NET: "192.168.30.0/24"
+    DNS_SERVERS: "$HOME_NET"
+  port-groups:
+    HTTP_PORTS: "80"
+    SHELLCODE_PORTS: "!80"
+    SSH_PORTS: "22"
+    DNP3_PORTS: "20000"
+    MODBUS_PORTS: "502"
+    FILE_DATA_PORTS: "[$HTTP_PORTS,110,143]"
+    FTP_PORTS: "21"
+    GENEVE_PORTS: "6081"
+    VXLAN_PORTS: "4789"
+    TEREDO_PORTS: "3544"
+
+default-log-dir: /data/suricata/
+
+outputs:
+  - eve-log:
+      enabled: yes
+      filetype: regular
+      filename: eve.json
+      types:
+        - alert:
+            tagged-packets: no
+        - anomaly:
+            enabled: yes
+  - stats:
+      enabled: no
+
+logging:
+  default-log-level: notice
+  outputs:
+    - console:
+        enabled: yes
+
+af-packet:
+  - interface: br-lan
+    threads: 1
+    cluster-id: 99
+    cluster-type: cluster_flow
+    defrag: yes
+    use-mmap: yes
+    ring-size: 2048
+
+default-rule-path: /etc/custos/suricata
+rule-files:
+  - custos.rules
+
+classification-file: /etc/suricata/classification.config
+reference-config-file: /etc/suricata/reference.config
+threshold-file: /etc/suricata/threshold.config
+
+app-layer:
+  protocols:
+    dns:
+      tcp:
+        enabled: yes
+        detection-ports:
+          dp: 53
+      udp:
+        enabled: yes
+        detection-ports:
+          dp: 53
+    http:
+      enabled: yes
+    tls:
+      enabled: yes
+      detection-ports:
+        dp: 443
+    ssh:
+      enabled: yes
+    smb:
+      enabled: yes
+      detection-ports:
+        dp: 139, 445
+
+# Memory: ~120-160 MB in total (measured values: docs/ids-sizing.md).
+max-pending-packets: 256
+runmode: workers
+detect:
+  profile: low
+  sgh-mpm-context: single
+  inspection-recursion-limit: 3000
+flow:
+  memcap: 16mb
+  hash-size: 16384
+  prealloc: 2000
+defrag:
+  memcap: 8mb
+stream:
+  memcap: 32mb
+  checksum-validation: no
+  reassembly:
+    memcap: 48mb
+    depth: 512kb
+host:
+  memcap: 8mb
+threading:
+  set-cpu-affinity: no

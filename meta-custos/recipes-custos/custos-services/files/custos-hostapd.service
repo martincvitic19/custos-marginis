@@ -1,0 +1,21 @@
+[Unit]
+Description=Custos Wi-Fi access point (hostapd)
+# custos-apply writes the configuration only when a radio exists and Wi-Fi
+# is enabled in custos.json.
+ConditionPathExists=/run/custos/hostapd.conf
+After=custos-apply-boot.service sys-subsystem-net-devices-wlan0.device
+
+[Service]
+Type=simple
+ExecStart=/usr/sbin/hostapd /run/custos/hostapd.conf
+# networkd can only enslave wlan0 to br-lan once hostapd has switched it to
+# AP mode ("Device does not allow enslaving to a bridge" in station mode).
+# If networkd tried first, it gave up after a few retries and wlan0 stayed
+# out of VLAN 10 (W-WIFI "wlan0 not PVID 10", 2026-11-21). Wait for AP mode,
+# then let networkd configure the AP interfaces again.
+ExecStartPost=-/bin/sh -c 'for i in $(seq 1 20); do iw dev wlan0 info 2>/dev/null | grep -q "type AP" && break; sleep 0.5; done; networkctl reconfigure wlan0 $(ls /sys/class/net | grep "^wlan0-")'
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
