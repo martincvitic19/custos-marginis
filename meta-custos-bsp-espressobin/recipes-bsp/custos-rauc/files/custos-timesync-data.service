@@ -1,0 +1,21 @@
+[Unit]
+Description=Keep the timesyncd clock file on /data (Custos, A10)
+# The board has no RTC: systemd-timesyncd sets the clock at boot from the
+# mtime of /var/lib/systemd/timesync/clock. With the read-only root file
+# system /var/lib is a tmpfs, so the file would be lost on every boot (and
+# not shared by the A/B slots). Bind a directory on /data over it.
+DefaultDependencies=no
+RequiresMountsFor=/data /var/lib/systemd
+After=var-volatile-lib.service
+Before=systemd-timesyncd.service sysinit.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# The target does not exist yet: timesyncd creates its StateDirectory only
+# when it starts, which is after this unit.
+ExecStart=/bin/sh -c 'mkdir -p /var/lib/systemd/timesync /data/timesync && chown systemd-timesync:systemd-timesync /data/timesync && (command -v restorecon >/dev/null && restorecon -R /data/timesync || true) && mount --bind /data/timesync /var/lib/systemd/timesync'
+ExecStop=/bin/umount /var/lib/systemd/timesync
+
+[Install]
+WantedBy=sysinit.target

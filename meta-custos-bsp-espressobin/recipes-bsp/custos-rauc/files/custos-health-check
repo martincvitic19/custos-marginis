@@ -1,0 +1,31 @@
+#!/bin/sh
+# A13 health check: the booted slot is "good" only if the router does its
+# job. Runs 3 minutes after boot. A slot that is still "trying" (just
+# updated) is marked good on success and rebooted on failure (one try
+# fewer; after 3 the boot guard falls back). A slot that is already good is
+# never rebooted from here: the failure only goes to the event log.
+BC=/usr/lib/custos/custos-bootchooser
+slot=$($BC get-current)
+state=$($BC get-raw-state "$slot")
+fail() {
+    echo "health check failed (slot $slot, $state): $*"
+    printf '{"time":"%s","kind":"health","severity":"alert","message":"Provjera zdravlja nije prošla (slot %s): %s"}\n' \
+        "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$slot" "$*" >> /data/custos/events.jsonl 2>/dev/null
+    [ "$state" = trying ] && exit 1
+    exit 0
+}
+systemctl is-active --quiet custos-firewall || fail "firewall"
+nft list chain inet custos dstnat >/dev/null 2>&1 || fail "nft policy"
+systemctl is-active --quiet adguardhome || fail "AdGuard Home"
+nslookup example.com 127.0.0.1 >/dev/null 2>&1 || fail "DNS"
+systemctl is-active --quiet custosd || fail "custosd"
+ip -4 addr show dev br-lan.20 | grep -q 'inet ' || fail "admin VLAN address"
+# A10: a freshly installed slot must match the root hash from its bundle.
+if [ "$state" = trying ] && [ -x /usr/lib/custos/custos-verity-check ]; then
+    /usr/lib/custos/custos-verity-check || fail "root file system integrity (dm-verity)"
+fi
+if [ "$state" != good ]; then
+    rauc status mark-good booted && echo "slot $slot marked good"
+else
+    echo "health check passed (slot $slot already good)"
+fi

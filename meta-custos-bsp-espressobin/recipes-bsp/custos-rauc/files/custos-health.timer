@@ -1,0 +1,9 @@
+[Unit]
+Description=Run the A/B health check after boot
+
+[Timer]
+OnBootSec=1min
+Unit=custos-health.service
+
+[Install]
+WantedBy=timers.target
