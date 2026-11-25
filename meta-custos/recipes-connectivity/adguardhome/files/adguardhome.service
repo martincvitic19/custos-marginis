@@ -18,6 +18,9 @@ Group=adguardhome
 WorkingDirectory=/data/adguardhome
 # First start: seed the configuration. AdGuard Home rewrites this file when
 # settings change in the UI, so it must live on writable storage.
+# "+": outside the sandbox. Creates the state directory if /data was
+# mounted after systemd-tmpfiles-setup ran.
+ExecStartPre=+/usr/bin/systemd-tmpfiles --create /usr/lib/tmpfiles.d/adguardhome.conf
 # UMask=0077 makes the copy 0600.
 ExecStartPre=/bin/sh -c 'test -e AdGuardHome.yaml || cp /usr/share/adguardhome/AdGuardHome.yaml AdGuardHome.yaml'
 ExecStart=/usr/bin/AdGuardHome --no-check-update --work-dir /data/adguardhome --config /data/adguardhome/AdGuardHome.yaml
